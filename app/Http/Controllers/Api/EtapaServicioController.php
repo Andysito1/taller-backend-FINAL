@@ -10,6 +10,7 @@ use App\Models\Notificacion;
 use App\Models\ConfiguracionUsuario;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use App\Services\FcmService;
 
@@ -44,33 +45,44 @@ class EtapaServicioController extends Controller
             ], 403);
         }
 
-        $etapa->estado = $request->estado;
-        $etapa->save();
+        DB::beginTransaction();
+        try {
+            $etapa->estado = $request->estado;
+            $etapa->save();
 
-        // Lógica de transición de etapas
-        // Si se completa una etapa y NO es diagnóstico, o si es diagnóstico pero ya está validado (caso raro)
-        if ($request->estado === 'completado' && $etapa->etapa !== 'diagnostico') {
-            $etapasOrden = $orden->etapas()->orderBy('id')->get();
-            $currentIndex = $etapasOrden->search(fn($item) => $item->id === $etapa->id);
+            // Lógica de transición de etapas
+            if ($request->estado === 'completado') {
+                if ($etapa->etapa === 'finalizacion') {
+                    // Si se completa la última etapa, cerramos la orden automáticamente
+                    $orden->estado = 'finalizado';
+                    $orden->fecha_fin = now();
+                    $orden->save();
+                } elseif ($etapa->etapa !== 'diagnostico') {
+                    // Si se completa una etapa (que no sea diagnóstico, pues requiere aprobación)
+                    $etapasOrden = $orden->etapas()->orderBy('id')->get();
+                    $currentIndex = $etapasOrden->search(fn($item) => $item->id === $etapa->id);
 
-            if ($currentIndex !== false && isset($etapasOrden[$currentIndex + 1])) {
-                $siguienteEtapa = $etapasOrden[$currentIndex + 1];
-                if ($siguienteEtapa->estado === 'pendiente') {
-                    $siguienteEtapa->estado = 'en_proceso';
-                    $siguienteEtapa->save();
+                    if ($currentIndex !== false && isset($etapasOrden[$currentIndex + 1])) {
+                        $siguienteEtapa = $etapasOrden[$currentIndex + 1];
+                        if ($siguienteEtapa->estado === 'pendiente') {
+                            $siguienteEtapa->estado = 'en_proceso';
+                            $siguienteEtapa->save();
 
-                    // Notificar también el inicio de la siguiente etapa
-                    $this->crearYEnviarNotificacion(
-                        $orden,
-                        $siguienteEtapa,
-                        'en_proceso'
-                    );
+                            // Notificar el inicio de la siguiente etapa
+                            $this->crearYEnviarNotificacion($orden, $siguienteEtapa, 'en_proceso');
+                        }
+                    }
                 }
             }
-        }
 
-        // Notificación de la etapa actual (la que se acaba de actualizar)
-        $this->crearYEnviarNotificacion($orden, $etapa, $request->estado);
+            // Notificación de la etapa actual que se acaba de actualizar
+            $this->crearYEnviarNotificacion($orden, $etapa, $request->estado);
+
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['error' => 'Error al actualizar etapa', 'detalle' => $e->getMessage()], 500);
+        }
 
         return response()->json([
             'success' => true,
@@ -119,21 +131,25 @@ class EtapaServicioController extends Controller
 
                 // 3. ENVIAR PUSH POR FIREBASE (Si el usuario tiene token)
                 if ($cliente->usuario && $cliente->usuario->fcm_token) {
-                    $this->fcmService->enviarNotificacion(
-                        $cliente->usuario->fcm_token,
-                        'Avance de Vehículo: ' . ($orden->vehiculo->placa ?? ''),
-                        $mensajeNotif,
-                        [
-                            'id'       => $notificacion->id,
-                            'orden_id' => $orden->id,
-                            'tipo'     => $notificacion->tipo,
-                            'titulo'   => $notificacion->titulo,
-                            'mensaje'  => $notificacion->mensaje,
-                            'created_at' => $notificacion->created_at->toIso8601String(),
-                            'leido'    => $notificacion->leido ? '1' : '0',
-                            'estado'   => $etapa->estado
-                        ]
-                    );
+                        try {
+                            $this->fcmService->enviarNotificacion(
+                                $cliente->usuario->fcm_token,
+                                'Avance de Vehículo: ' . ($orden->vehiculo->placa ?? ''),
+                                $mensajeNotif,
+                                [
+                                    'id'       => $notificacion->id,
+                                    'orden_id' => $orden->id,
+                                    'tipo'     => $notificacion->tipo,
+                                    'titulo'   => $notificacion->titulo,
+                                    'mensaje'  => $notificacion->mensaje,
+                                    'created_at' => $notificacion->created_at->toIso8601String(),
+                                    'leido'    => $notificacion->leido ? '1' : '0',
+                                    'estado'   => $etapa->estado
+                                ]
+                            );
+                        } catch (\Exception $e) {
+                            Log::warning("Error al enviar notificación FCM: " . $e->getMessage());
+                        }
                 }
             }
         }
@@ -150,7 +166,8 @@ class EtapaServicioController extends Controller
             'estado' => 'required|in:aprobado,aclaracion'
         ]);
 
-        $orden = OrdenServicio::with(['etapas', 'vehiculo.cliente'])->findOrFail($idOrden);
+        // Cargamos toda la cadena de relaciones necesaria de una vez
+        $orden = OrdenServicio::with(['etapas', 'vehiculo.cliente.usuario'])->findOrFail($idOrden);
         $user = $request->user();
         $user->load('rol');
 
@@ -158,6 +175,9 @@ class EtapaServicioController extends Controller
         $esAdmin = $user->rol->nombre === 'ADMIN';
 
         if (!$esAdmin) {
+            if (!$orden->vehiculo) {
+                return response()->json(['message' => 'Vehículo no asociado a la orden.'], 404);
+            }
             // Buscamos el registro del cliente asociado al usuario autenticado
             $perfilCliente = \App\Models\Cliente::where('id_usuario', $user->id)->first();
             if (!$perfilCliente || (int)$orden->vehiculo->id_cliente !== (int)$perfilCliente->id) {
@@ -191,48 +211,17 @@ class EtapaServicioController extends Controller
 
             DB::commit();
 
-            // Enviar notificación de que el proceso avanzó tras la validación
-            $cliente = $orden->vehiculo->cliente;
-            if ($cliente && $cliente->usuario) {
-                $mensaje = $request->estado === 'aprobado' 
-                    ? "¡Servicio aprobado! Tu vehículo ha pasado a la etapa de Reparación." 
-                    : "Se ha solicitado una aclaración sobre el diagnóstico de tu vehículo.";
-
-                $notificacion = Notificacion::create([
-                    'id_cliente' => $cliente->id,
-                    'titulo'     => 'Estado de Validación',
-                    'mensaje'    => $mensaje,
-                    'tipo'       => 'servicio',
-                    'leido'      => false
-                ]);
-
-                // Emitir evento de Socket para actualización en tiempo real
-                $config = ConfiguracionUsuario::where('id_cliente', $cliente->id)->first();
-                if (!$config || $config->notificaciones_activas) {
-                    $payload = $notificacion->toArray();
-                    if ($notificacion->created_at) {
-                        $payload['created_at'] = $notificacion->created_at->toIso8601String();
+                // Notificar el cambio de estado de la orden reutilizando la lógica centralizada
+                if ($request->estado === 'aprobado') {
+                    $etapaReparacion = $orden->etapas()->where('etapa', 'reparacion')->first();
+                    if ($etapaReparacion) {
+                        $this->crearYEnviarNotificacion($orden, $etapaReparacion, 'en_proceso');
                     }
-                    event(new NuevaNotificacion($payload, 'cliente.' . $cliente->id));
-                }
-
-                if ($cliente->usuario->fcm_token) {
-                    $this->fcmService->enviarNotificacion(
-                        $cliente->usuario->fcm_token,
-                        'Actualización de Orden',
-                        $mensaje,
-                        [
-                            'id'       => $notificacion->id,
-                            'orden_id' => $orden->id,
-                            'tipo'     => $notificacion->tipo,
-                            'titulo'   => $notificacion->titulo,
-                            'mensaje'  => $notificacion->mensaje,
-                            'created_at' => $notificacion->created_at->toIso8601String(),
-                            'leido'    => $notificacion->leido ? '1' : '0',
-                            'estado'   => $request->estado === 'aprobado' ? 'en_proceso' : 'pendiente'
-                        ]
-                    );
-                }
+                } else {
+                    $etapaDiagnostico = $orden->etapas()->where('etapa', 'diagnostico')->first();
+                    if ($etapaDiagnostico) {
+                        $this->crearYEnviarNotificacion($orden, $etapaDiagnostico, 'pendiente');
+                    }
             }
 
             return response()->json([
@@ -241,8 +230,11 @@ class EtapaServicioController extends Controller
                 'validacion' => $request->estado
             ]);
         } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['error' => 'Error al validar diagnóstico'], 500);
+            if (DB::transactionLevel() > 0) DB::rollBack();
+            return response()->json([
+                'error' => 'Error al validar diagnóstico',
+                'detalle' => $e->getMessage() // Esto te dirá exactamente qué falló en la consola del móvil
+            ], 500);
         }
     }
 }

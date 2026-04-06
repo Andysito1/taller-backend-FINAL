@@ -22,12 +22,12 @@ class SeguimientoController extends Controller
         // Si quisieras filtrar solo las activas, podrías agregar ->where('estado', 'en_proceso')
         $orden = OrdenServicio::where('id_vehiculo', $id_vehiculo)
                     ->with('etapas') // Cargar la relación de etapas
-                    ->latest() 
+                    ->latest('id') // Aseguramos que sea por el ID más alto (el más reciente)
                     ->first();
 
         // Si no hay orden, retornamos lista vacía (la app mostrará "No hay orden activa")
         if (!$orden) {
-            return response()->json(['etapas' => []]);
+            return response()->json(['id' => null, 'id_orden' => null, 'etapas' => []]);
         }
 
         // 3. Formatear las etapas para la App Móvil
@@ -35,6 +35,7 @@ class SeguimientoController extends Controller
         // a textos legibles para el usuario (ej: 'Diagnóstico', 'En Progreso')
         $etapas = $orden->etapas->map(function($etapa) {
             return [
+                'id' => $etapa->id,
                 'titulo' => $this->getTituloEtapa($etapa->etapa),
                 'descripcion' => $this->getDescripcionEtapa($etapa->etapa),
                 'estado' => $this->formatEstado($etapa->estado),
@@ -44,6 +45,8 @@ class SeguimientoController extends Controller
         });
 
         return response()->json([
+            'id' => $orden->id, // Agregamos 'id' para que el modelo del móvil lo reconozca automáticamente
+            'id_orden' => $orden->id,
             'etapas' => $etapas,
             'validacion' => [
                 'estado' => $orden->validacion_diagnostico,

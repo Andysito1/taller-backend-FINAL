@@ -103,20 +103,24 @@ class NotificacionController extends Controller
             $cliente = Cliente::with('usuario')->find($request->id_cliente);
             
             if ($cliente && $cliente->usuario && $cliente->usuario->fcm_token) {
-                $fcmService = app(FcmService::class);
-                $fcmService->enviarNotificacion(
-                    $cliente->usuario->fcm_token,
-                    $notificacion->titulo,
-                    $notificacion->mensaje,
-                    [
-                        'id'   => $notificacion->id,
-                        'tipo' => $notificacion->tipo,
-                        'titulo' => $notificacion->titulo,
-                        'mensaje' => $notificacion->mensaje,
-                        'created_at' => $notificacion->created_at->toIso8601String(),
-                        'leido' => $notificacion->leido ? '1' : '0'
-                    ]
-                );
+                try {
+                    $fcmService = app(FcmService::class);
+                    $fcmService->enviarNotificacion(
+                        $cliente->usuario->fcm_token,
+                        $notificacion->titulo,
+                        $notificacion->mensaje,
+                        [
+                            'id'   => $notificacion->id,
+                            'tipo' => $notificacion->tipo,
+                            'titulo' => $notificacion->titulo,
+                            'mensaje' => $notificacion->mensaje,
+                            'created_at' => $notificacion->created_at->toIso8601String(),
+                            'leido' => $notificacion->leido ? '1' : '0'
+                        ]
+                    );
+                } catch (\Exception $e) {
+                    Log::warning("Fallo al enviar Push FCM: " . $e->getMessage());
+                }
             }
 
             return response()->json($notificacion, 201);

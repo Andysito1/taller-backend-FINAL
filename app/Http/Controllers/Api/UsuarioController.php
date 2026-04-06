@@ -13,6 +13,7 @@ use App\Models\Cliente;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use GuzzleHttp\Client;
+use Illuminate\Support\Facades\Auth;
 
 class UsuarioController extends Controller
 {
@@ -130,6 +131,51 @@ class UsuarioController extends Controller
                 'detalle' => $e->getMessage()
             ], 500);
         }
+    }
+
+    // Actualizar usuario
+    public function update(Request $request, $id)
+    {
+        $usuario = Usuario::findOrFail($id);
+
+        $request->validate([
+            'nombre' => 'required|string|max:255',
+            'correo' => 'required|email|unique:usuarios,correo,' . $id,
+            'id_rol' => 'required|exists:roles,id',
+            'password' => 'nullable|min:6'
+        ]);
+
+        $data = $request->only(['nombre', 'correo', 'id_rol', 'telefono', 'direccion', 'id_tipo_documento', 'numero_documento']);
+        
+        if ($request->filled('password')) {
+            $data['password'] = Hash::make($request->password);
+        }
+
+        $usuario->update($data);
+
+        // Si es mecánico, actualizar especialidad
+        if ($usuario->id_rol == 2) { // Asumiendo 2 es MECANICO
+            Mecanico::updateOrCreate(
+                ['id_usuario' => $usuario->id],
+                ['especialidad' => $request->especialidad ?? 'General']
+            );
+        }
+
+        return response()->json(['message' => 'Usuario actualizado', 'usuario' => $usuario->load('rol')]);
+    }
+
+    // Eliminar usuario
+    public function destroy($id)
+    {
+        $usuario = Usuario::findOrFail($id);
+        
+        // Evitar que el admin se borre a sí mismo si fuera necesario
+        if (Auth::id() === $usuario->id) {
+            return response()->json(['error' => 'No puedes eliminar tu propia cuenta'], 400);
+        }
+
+        $usuario->delete();
+        return response()->json(['message' => 'Usuario eliminado correctamente']);
     }
 
     // Activar / Desactivar usuario

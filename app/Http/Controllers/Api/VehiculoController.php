@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Vehiculo;
 use App\Models\Cliente;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
 
 class VehiculoController extends Controller
@@ -55,8 +56,14 @@ class VehiculoController extends Controller
             'modelo'     => 'required|string|max:50',
             'anio'       => 'required|integer',
             'placa'      => 'required|string|max:20|unique:vehiculos,placa',
-            'imagen'     => 'nullable|string'
+            'imagen'     => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
         ]);
+
+        // Lógica para procesar y guardar la imagen
+        if ($request->hasFile('imagen')) {
+            $path = $request->file('imagen')->store('vehiculos', 'public');
+            $validData['imagen'] = $path;
+        }
 
         $vehiculo = Vehiculo::create($validData);
 
@@ -64,5 +71,44 @@ class VehiculoController extends Controller
             'message' => 'Vehículo registrado correctamente',
             'vehiculo' => $vehiculo
         ], 201);
+    }
+
+    // Actualizar vehículo
+    public function update(Request $request, $id)
+    {
+        $vehiculo = Vehiculo::findOrFail($id);
+
+        $validData = $request->validate([
+            'id_cliente' => 'required|exists:clientes,id',
+            'marca'      => 'required|string|max:50',
+            'modelo'     => 'required|string|max:50',
+            'anio'       => 'required|integer',
+            'placa'      => 'required|string|max:20|unique:vehiculos,placa,' . $id,
+            'imagen'     => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
+        ]);
+
+        if ($request->hasFile('imagen')) {
+            // Eliminar imagen anterior si existe para no llenar el disco
+            if ($vehiculo->imagen) {
+                Storage::disk('public')->delete($vehiculo->imagen);
+            }
+            $path = $request->file('imagen')->store('vehiculos', 'public');
+            $validData['imagen'] = $path;
+        }
+
+        $vehiculo->update($validData);
+
+        return response()->json(['message' => 'Vehículo actualizado', 'vehiculo' => $vehiculo]);
+    }
+
+    // Eliminar vehículo
+    public function destroy($id)
+    {
+        $vehiculo = Vehiculo::findOrFail($id);
+        if ($vehiculo->imagen) {
+            Storage::disk('public')->delete($vehiculo->imagen);
+        }
+        $vehiculo->delete();
+        return response()->json(['message' => 'Vehículo eliminado correctamente']);
     }
 }

@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('ordenes_servicio', function (Blueprint $table) {
             // 'en_espera' es el estado inicial, 'aprobado' cuando el cliente/admin valida.
-            $table->enum('validacion_diagnostico', ['en_espera', 'aprobado'])
+            $table->enum('validacion_diagnostico', ['en_espera', 'aprobado', 'aclaracion'])
                   ->default('en_espera')
                   ->after('estado');
         });

@@ -7,11 +7,23 @@ use App\Models\OrdenServicio;
 use App\Models\EtapaServicio;
 use App\Models\Vehiculo;
 use Illuminate\Http\Request;
+use App\Models\Notificacion;
+use App\Models\ConfiguracionUsuario;
+use App\Services\FcmService;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon;
 
 class OrdenServicioController extends Controller
 {
+    /**
+     * Inyectar servicio de notificaciones Push
+     */
+    public function __construct(protected FcmService $fcmService)
+    {
+    }
+
     /**
      * Listar todas las órdenes (Vista Admin)
      */
@@ -124,9 +136,86 @@ class OrdenServicioController extends Controller
     public function historialPorVehiculo($id_vehiculo)
     {
         $historial = OrdenServicio::where('id_vehiculo', $id_vehiculo)
+            ->where('estado', 'finalizado')
             ->with(['etapas', 'mecanico'])
             ->orderBy('created_at', 'desc')
             ->get();
         return response()->json($historial);
+    }
+
+    /**
+     * Actualizar una orden (General)
+     */
+    public function update(Request $request, $id)
+    {
+        $orden = OrdenServicio::findOrFail($id);
+
+        $request->validate([
+            'estado' => 'sometimes|in:en_proceso,pausado,finalizado',
+            'fecha_fin' => 'nullable|date'
+        ]);
+
+        $data = $request->only(['estado', 'fecha_fin', 'titulo', 'descripcion']);
+
+        // Si el estado cambia a finalizado, asegurar fecha_fin
+        if (isset($data['estado']) && $data['estado'] === 'finalizado' && !$orden->fecha_fin) {
+            $data['fecha_fin'] = Carbon::now()->toDateString();
+        }
+
+        $estadoAnterior = $orden->getOriginal('estado');
+        $orden->update($data);
+
+        // Si el estado cambió, notificar al cliente
+        if (isset($data['estado']) && $data['estado'] !== $estadoAnterior) {
+            $this->notificarCambioEstadoOrden($orden);
+        }
+
+        return response()->json(['message' => 'Orden actualizada con éxito', 'data' => $orden]);
+    }
+
+    /**
+     * Lógica de notificación cuando cambia el estado general de la orden
+     */
+    private function notificarCambioEstadoOrden($orden)
+    {
+        $orden->load('vehiculo.cliente.usuario');
+        if ($orden->vehiculo && $orden->vehiculo->cliente) {
+            $cliente = $orden->vehiculo->cliente;
+            $nuevoEstado = ucfirst(str_replace('_', ' ', $orden->estado));
+            
+            $mensaje = $orden->estado === 'finalizado' 
+                ? "¡Tu vehículo con placa {$orden->vehiculo->placa} ya está listo!" 
+                : "El estado de tu servicio ha cambiado a: {$nuevoEstado}";
+
+            // 1. Guardar en BD
+            $notificacion = Notificacion::create([
+                'id_cliente' => $cliente->id,
+                'titulo'     => 'Estado de Servicio',
+                'mensaje'    => $mensaje,
+                'tipo'       => 'servicio',
+                'leido'      => false
+            ]);
+
+            // 2. Verificar configuración y enviar Push
+            $config = ConfiguracionUsuario::where('id_cliente', $cliente->id)->first();
+            if (!$config || $config->notificaciones_activas) {
+                if ($cliente->usuario && $cliente->usuario->fcm_token) {
+                    try {
+                        $this->fcmService->enviarNotificacion(
+                            $cliente->usuario->fcm_token,
+                            'Taller: Actualización de Orden',
+                            $mensaje,
+                            [
+                                'id' => $notificacion->id,
+                                'orden_id' => $orden->id,
+                                'tipo' => 'servicio'
+                            ]
+                        );
+                    } catch (\Exception $e) {
+                        Log::warning("Error FCM en OrdenServicio: " . $e->getMessage());
+                    }
+                }
+            }
+        }
     }
 }

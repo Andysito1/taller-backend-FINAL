@@ -38,6 +38,8 @@ Route::middleware(['auth:sanctum', 'role:ADMIN'])->group(function () {
     Route::get('/ordenes-servicio', [OrdenServicioController::class, 'index']);
     Route::post('/usuarios', [UsuarioController::class, 'store']);
     Route::get('/usuarios', [UsuarioController::class, 'index']);
+    Route::put('/usuarios/{id}', [UsuarioController::class, 'update']);
+    Route::delete('/usuarios/{id}', [UsuarioController::class, 'destroy']);
     Route::put('/usuarios/{id}/toggle', [UsuarioController::class, 'toggleActivo']);
     Route::get('/mecanicos', [UsuarioController::class, 'indexMecanicos']);
     Route::get('/clientes', [ClienteController::class, 'index']);
@@ -45,20 +47,22 @@ Route::middleware(['auth:sanctum', 'role:ADMIN'])->group(function () {
     Route::post('/consulta-documento', [UsuarioController::class, 'consultarDocumento']);
     Route::post('/notificaciones', [NotificacionController::class, 'store']);
     Route::get('tipos-documento', [UsuarioController::class, 'indexTiposDocumento']);
-    Route::post('etapa-servicio/validar-diagnostico/{idOrden}', [EtapaServicioController::class, 'validarDiagnostico']);
 });
-
-// Rutas compartidas para Admin y Cliente
+    
+    // Rutas compartidas para Admin y Cliente
 Route::middleware(['auth:sanctum', 'role:ADMIN,CLIENTE'])->group(function () {
     Route::get('/ordenes', [OrdenServicioController::class, 'index']);
     Route::get('/ordenes/{id}', [OrdenServicioController::class, 'show']);
+    Route::patch('/ordenes/{id}', [OrdenServicioController::class, 'update']); // Soluciona error 405 PATCH
+    Route::get('/orden-servicio/{id}', [OrdenServicioController::class, 'show']); // Alias para compatibilidad con la App Móvil
     Route::get('/seguimiento/{id_vehiculo}', [SeguimientoController::class, 'show']);
+    Route::post('etapa-servicio/validar-diagnostico/{idOrden}', [EtapaServicioController::class, 'validarDiagnostico']);
 });
 
 // Rutas para Mecánicos
 Route::middleware(['auth:sanctum', 'role:MECANICO'])->group(function () {
     Route::get('/mis-ordenes', [OrdenServicioController::class, 'misOrdenes']);
-    Route::put('/ordenes/{id}/estado', [OrdenServicioController::class, 'updateEstado']);
+    Route::put('/ordenes/{id}/estado', [OrdenServicioController::class, 'update']);
 });
 
 // Rutas para Clientes
@@ -83,6 +87,8 @@ Route::middleware(['auth:sanctum', 'role:ADMIN,MECANICO'])->group(function () {
 
     Route::post('/vehiculos', [VehiculoController::class, 'store']);
     Route::get('/vehiculos', [VehiculoController::class, 'index']);
-    Route::put('/etapas/{id}', [EtapaServicioController::class, 'update']);
+    Route::put('/vehiculos/{id}', [VehiculoController::class, 'update']);
+    Route::delete('/vehiculos/{id}', [VehiculoController::class, 'destroy']);
+    Route::patch('/etapa-servicio/{id}', [EtapaServicioController::class, 'update']);
     Route::post('/finanzas', [FinanzaServicioController::class, 'store']);
 });
