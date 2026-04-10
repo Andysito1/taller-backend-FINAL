@@ -40,7 +40,7 @@ Route::middleware(['auth:sanctum', 'role:ADMIN'])->group(function () {
     Route::get('/usuarios', [UsuarioController::class, 'index']);
     Route::put('/usuarios/{id}', [UsuarioController::class, 'update']);
     Route::delete('/usuarios/{id}', [UsuarioController::class, 'destroy']);
-    Route::put('/usuarios/{id}/toggle', [UsuarioController::class, 'toggleActivo']);
+    Route::put('/usuarios/{id}/toggle-activo', [UsuarioController::class, 'toggleActivo']);
     Route::get('/mecanicos', [UsuarioController::class, 'indexMecanicos']);
     Route::get('/clientes', [ClienteController::class, 'index']);
     Route::get('/roles', [RoleController::class, 'index']);
