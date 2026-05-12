@@ -4,15 +4,13 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\FinanzaServicio;
-use App\Models\OrdenServicio; // Asegúrate de importar esto
+use App\Models\OrdenServicio;
 use Illuminate\Http\Request;
 
 class FinanzaServicioController extends Controller
 {
-    // ... tu método store existente ...
     public function store(Request $request)
     {
-        // ... (código existente) ...
         $request->validate([
             'id_orden' => 'required|exists:ordenes_servicio,id',
             'concepto' => 'required|string|max:100',
