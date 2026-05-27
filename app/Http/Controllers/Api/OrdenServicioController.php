@@ -13,6 +13,8 @@ use App\Services\FcmService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail; // Asegúrate de que apunte al Facade
+use App\Mail\OrderShipped;
 use Carbon\Carbon;
 
 class OrdenServicioController extends Controller
@@ -29,7 +31,7 @@ class OrdenServicioController extends Controller
      */
     public function index()
     {
-        $ordenes = OrdenServicio::with(['vehiculo.cliente.usuario', 'mecanico', 'etapas'])
+        $ordenes = OrdenServicio::with(['vehiculo.cliente.usuario', 'mecanico', 'etapas', 'servicio'])
             ->latest()
             ->get();
         return response()->json($ordenes);
@@ -43,9 +45,11 @@ class OrdenServicioController extends Controller
         $request->validate([
             'id_vehiculo'  => 'required|exists:vehiculos,id',
             'id_mecanico'  => 'required|exists:usuarios,id',
+            'id_servicio'  => 'required|exists:servicios,id', // Nuevo campo
             'titulo'       => 'required|string|max:100',
             'descripcion'  => 'required|string',
             'fecha_inicio' => 'required|date',
+            'costo_total'  => 'nullable|numeric|min:0', // Nuevo campo, puede ser nulo al inicio
         ]);
 
         // Verificar si el vehículo ya tiene una orden activa
@@ -63,12 +67,24 @@ class OrdenServicioController extends Controller
             $orden = OrdenServicio::create([
                 'id_vehiculo'  => $request->id_vehiculo,
                 'id_mecanico'  => $request->id_mecanico,
+                'id_servicio'  => $request->id_servicio, // Asignar el servicio
                 'titulo'       => $request->titulo,
                 'descripcion'  => $request->descripcion,
                 'fecha_inicio' => $request->fecha_inicio,
                 'estado'       => 'en_proceso',
+                'costo_total'  => $request->costo_total ?? 0.00, // Establecer costo inicial
                 'validacion_diagnostico' => 'en_espera'
             ]);
+
+            // Registro del costo base inicial en la tabla de finanzas para consistencia
+            if ($orden->costo_total > 0) {
+                \App\Models\FinanzaServicio::create([
+                    'id_orden' => $orden->id,
+                    'concepto' => 'Costo Base de Servicio',
+                    'tipo' => 'base',
+                    'monto' => $orden->costo_total
+                ]);
+            }
 
             // 2. Crear las 4 etapas obligatorias para el seguimiento
             $etapas = ['diagnostico', 'reparacion', 'pruebas', 'finalizacion'];
@@ -95,7 +111,7 @@ class OrdenServicioController extends Controller
      */
     public function show($id)
     {
-        $orden = OrdenServicio::with(['vehiculo.cliente.usuario', 'mecanico', 'etapas'])
+        $orden = OrdenServicio::with(['vehiculo.cliente.usuario', 'mecanico', 'etapas', 'servicio'])
             ->findOrFail($id);
         return response()->json($orden);
     }
@@ -107,7 +123,7 @@ class OrdenServicioController extends Controller
     {
         $user = Auth::user();
         $ordenes = OrdenServicio::where('id_mecanico', $user->id)
-            ->with(['vehiculo.cliente.usuario', 'etapas'])
+            ->with(['vehiculo.cliente.usuario', 'etapas', 'servicio'])
             ->latest()
             ->get();
         return response()->json($ordenes);
@@ -119,7 +135,7 @@ class OrdenServicioController extends Controller
     public function seguimientoVehiculo($id_vehiculo)
     {
         $orden = OrdenServicio::where('id_vehiculo', $id_vehiculo)
-            ->with('etapas')
+            ->with(['etapas', 'servicio'])
             ->latest()
             ->first();
 
@@ -137,7 +153,7 @@ class OrdenServicioController extends Controller
     {
         $historial = OrdenServicio::where('id_vehiculo', $id_vehiculo)
             ->where('estado', 'finalizado')
-            ->with(['etapas', 'mecanico'])
+            ->with(['etapas', 'mecanico', 'servicio'])
             ->orderBy('created_at', 'desc')
             ->get();
         return response()->json($historial);
@@ -152,10 +168,12 @@ class OrdenServicioController extends Controller
 
         $request->validate([
             'estado' => 'sometimes|in:en_proceso,pausado,finalizado',
-            'fecha_fin' => 'nullable|date'
+            'fecha_fin' => 'nullable|date',
+            'id_servicio' => 'sometimes|exists:servicios,id', // Permitir actualizar el servicio
+            'costo_total' => 'sometimes|numeric|min:0', // Permitir actualizar el costo total
         ]);
 
-        $data = $request->only(['estado', 'fecha_fin', 'titulo', 'descripcion']);
+        $data = $request->only(['estado', 'fecha_fin', 'titulo', 'descripcion', 'id_servicio', 'costo_total']);
 
         // Si el estado cambia a finalizado, asegurar fecha_fin
         if (isset($data['estado']) && $data['estado'] === 'finalizado' && !$orden->fecha_fin) {
@@ -178,6 +196,17 @@ class OrdenServicioController extends Controller
      */
     private function notificarCambioEstadoOrden($orden)
     {
+        // 2. Enviar Correo vía Resend (Re-incorporado de la primera solicitud)
+        // Asegúrate de que el Mailable OrderShipped ahora usa OrdenServicio
+        if ($orden->vehiculo && $orden->vehiculo->cliente && $orden->vehiculo->cliente->usuario && $orden->vehiculo->cliente->usuario->correo) {
+            try {
+                Mail::to($orden->vehiculo->cliente->usuario->correo)->send(new OrderShipped($orden));
+            } catch (\Exception $e) {
+                Log::error("Error al enviar email de actualización de orden vía Resend: " . $e->getMessage());
+            }
+        }
+
+        // Lógica de notificación Push existente
         $orden->load('vehiculo.cliente.usuario');
         if ($orden->vehiculo && $orden->vehiculo->cliente) {
             $cliente = $orden->vehiculo->cliente;
@@ -196,7 +225,7 @@ class OrdenServicioController extends Controller
                 'leido'      => false
             ]);
 
-            // 2. Verificar configuración y enviar Push
+            // Verificar configuración y enviar Push
             $config = ConfiguracionUsuario::where('id_cliente', $cliente->id)->first();
             if (!$config || $config->notificaciones_activas) {
                 if ($cliente->usuario && $cliente->usuario->fcm_token) {

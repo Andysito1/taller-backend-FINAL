@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\FinanzaServicioController;
 use App\Http\Controllers\Api\SeguimientoController;
 use App\Http\Controllers\Api\ConfiguracionUsuarioController;
 use App\Http\Controllers\Api\NotificacionController;
+use App\Http\Controllers\Api\ReporteController;
 
 Route::get('/sanctum/csrf-cookie', function () {
     return response()->json(['csrf' => 'ok']);
@@ -47,6 +48,7 @@ Route::middleware(['auth:sanctum', 'role:ADMIN'])->group(function () {
     Route::post('/consulta-documento', [UsuarioController::class, 'consultarDocumento']);
     Route::post('/notificaciones', [NotificacionController::class, 'store']);
     Route::get('tipos-documento', [UsuarioController::class, 'indexTiposDocumento']);
+    Route::get('reportes/clientes-servicios', [ReporteController::class, 'exportarClientesServicios']);
 });
     
     // Rutas compartidas para Admin y Cliente

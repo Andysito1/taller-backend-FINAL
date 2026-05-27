@@ -2,15 +2,17 @@
 
 namespace App\Models;
 
-use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Usuario extends Authenticatable
 {
     use HasApiTokens, Notifiable;
 
-    protected $table = 'usuarios'; // IMPORTANTE
+    protected $table = 'usuarios';
 
     protected $fillable = [
         'nombre',
@@ -18,6 +20,9 @@ class Usuario extends Authenticatable
         'password',
         'id_rol',
         'activo',
+        'fcm_token',
+        'codigo_recuperacion',
+        'codigo_expira_at',
         'telefono',
         'direccion',
         'id_tipo_documento',
@@ -25,32 +30,22 @@ class Usuario extends Authenticatable
     ];
 
     protected $hidden = [
-        'password'
+        'password',
+        'codigo_recuperacion',
     ];
 
-    // Indicar que el campo de login es correo
-    public function getAuthIdentifierName()
-    {
-        return 'correo';
-    }
+    protected $casts = [
+        'codigo_expira_at' => 'datetime',
+        'activo' => 'boolean',
+    ];
 
-    public function rol()
+    public function rol(): BelongsTo
     {
         return $this->belongsTo(Role::class, 'id_rol');
     }
 
-    public function tipoDocumento()
+    public function reportesGenerados(): HasMany
     {
-        return $this->belongsTo(TipoDocumento::class, 'id_tipo_documento');
-    }
-
-    public function cliente()
-    {
-        return $this->hasOne(Cliente::class, 'id_usuario');
-    }
-
-    public function mecanico()
-    {
-        return $this->hasOne(Mecanico::class, 'id_usuario');
+        return $this->hasMany(AuditoriaReporte::class, 'id_usuario');
     }
 }

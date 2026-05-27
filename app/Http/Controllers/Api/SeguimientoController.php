@@ -20,7 +20,7 @@ class SeguimientoController extends Controller
         // 2. Buscar la orden más reciente para este vehículo.
         // Usamos 'latest()' para obtener la última creada.
         // Si quisieras filtrar solo las activas, podrías agregar ->where('estado', 'en_proceso')
-        $orden = OrdenServicio::where('id_vehiculo', $id_vehiculo)
+        $orden = OrdenServicio::where('id_vehiculo', $id_vehiculo)->with('servicio')
                     ->with('etapas') // Cargar la relación de etapas
                     ->latest('id') // Aseguramos que sea por el ID más alto (el más reciente)
                     ->first();
@@ -47,6 +47,7 @@ class SeguimientoController extends Controller
         return response()->json([
             'id' => $orden->id, // Agregamos 'id' para que el modelo del móvil lo reconozca automáticamente
             'id_orden' => $orden->id,
+            'servicio' => $orden->servicio ? $orden->servicio->nombre : 'N/A', // Mostrar el nombre del servicio
             'etapas' => $etapas,
             'validacion' => [
                 'estado' => $orden->validacion_diagnostico,

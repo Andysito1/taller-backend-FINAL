@@ -2,42 +2,52 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class OrdenServicio extends Model
 {
+    use HasFactory;
+
     protected $table = 'ordenes_servicio';
 
     protected $fillable = [
         'id_vehiculo',
         'id_mecanico',
+        'id_servicio', // Nuevo
         'titulo',
         'descripcion',
         'estado',
-        'validacion_diagnostico',
+        'costo_total', // Nuevo
         'fecha_inicio',
-        'fecha_fin'
+        'fecha_fin',
+        'validacion_diagnostico'
     ];
 
-    // Relación con vehículo
-    public function vehiculo()
+    protected $casts = [
+        'costo_total' => 'decimal:2',
+        'fecha_inicio' => 'date',
+        'fecha_fin' => 'date',
+    ];
+
+    public function servicio(): BelongsTo
+    {
+        return $this->belongsTo(Servicio::class, 'id_servicio');
+    }
+
+    public function vehiculo(): BelongsTo
     {
         return $this->belongsTo(Vehiculo::class, 'id_vehiculo');
     }
 
-    public function mecanico()
-    {
-        return $this->belongsTo(Usuario::class, 'id_mecanico');
-    }
-
-    // Relación con etapas
-    public function etapas()
+    public function etapas(): HasMany
     {
         return $this->hasMany(EtapaServicio::class, 'id_orden');
     }
 
-    // Relación con finanzas
-    public function finanzas()
+    public function finanzas(): HasMany
     {
         return $this->hasMany(FinanzaServicio::class, 'id_orden');
     }
