@@ -48,6 +48,7 @@ Route::middleware(['auth:sanctum', 'role:ADMIN'])->group(function () {
     Route::post('/consulta-documento', [UsuarioController::class, 'consultarDocumento']);
     Route::post('/notificaciones', [NotificacionController::class, 'store']);
     Route::get('tipos-documento', [UsuarioController::class, 'indexTiposDocumento']);
+    Route::get('servicios-lista', function() { return \App\Models\Servicio::all(); });
     Route::get('reportes/clientes-servicios', [ReporteController::class, 'exportarClientesServicios']);
 });
     

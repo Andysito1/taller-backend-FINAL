@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Exports\ClientesServiciosExport;
+use App\Exports\ClientesServiciosExport; // Ahora funcionará tras mover el archivo
 use App\Models\AuditoriaReporte;
 use Maatwebsite\Excel\Facades\Excel;
 use Carbon\Carbon;
