@@ -11,6 +11,7 @@ use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Color;
+use PhpOffice\PhpSpreadsheet\Style\Border;
 use Maatwebsite\Excel\Events\AfterSheet;
 
 class ClientesServiciosExport implements FromQuery, WithHeadings, WithMapping, WithEvents, ShouldAutoSize
@@ -22,10 +23,10 @@ class ClientesServiciosExport implements FromQuery, WithHeadings, WithMapping, W
     public function query()
     {
         $query = OrdenServicio::query()
-            ->join('vehiculos', 'ordenes_servicio.id_vehiculo', '=', 'vehiculos.id')
-            ->join('clientes', 'vehiculos.id_cliente', '=', 'clientes.id')
-            ->join('usuarios', 'clientes.id_usuario', '=', 'usuarios.id')
-            ->join('servicios', 'ordenes_servicio.id_servicio', '=', 'servicios.id')
+            ->leftJoin('vehiculos', 'ordenes_servicio.id_vehiculo', '=', 'vehiculos.id')
+            ->leftJoin('clientes', 'vehiculos.id_cliente', '=', 'clientes.id')
+            ->leftJoin('usuarios', 'clientes.id_usuario', '=', 'usuarios.id')
+            ->leftJoin('servicios', 'ordenes_servicio.id_servicio', '=', 'servicios.id')
             ->select([
                 'usuarios.nombre as cliente_nombre',
                 'usuarios.correo as cliente_correo',
@@ -77,9 +78,9 @@ class ClientesServiciosExport implements FromQuery, WithHeadings, WithMapping, W
             $orden->placa,
             $orden->marca,
             $orden->modelo,
-            $orden->servicio_nombre,
+            $orden->servicio_nombre ?? 'Sin servicio asignado',
             'S/ ' . number_format($orden->costo_total, 2),
-            $orden->fecha_inicio,
+            $orden->fecha_inicio ? \Carbon\Carbon::parse($orden->fecha_inicio)->format('d/m/Y') : 'N/A',
             ucfirst($orden->estado)
         ];
     }
@@ -101,7 +102,14 @@ class ClientesServiciosExport implements FromQuery, WithHeadings, WithMapping, W
                     ],
                 ]);
                 
+                // Bordes para los encabezados
+                $event->sheet->getStyle($headerRange)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+                
+                // Habilitar filtros
                 $event->sheet->getDelegate()->setAutoFilter($headerRange);
+
+                // Congelar la fila superior para que los encabezados siempre sean visibles
+                $event->sheet->getDelegate()->freezePane('A2');
             },
         ];
     }

@@ -27,6 +27,7 @@ class ReporteController extends Controller
         if ($request->tipo_filtro === 'anio') {
             $filtros['anio'] = $request->anio ?? Carbon::now()->year;
         } elseif ($request->tipo_filtro === 'mes_especifico') {
+            $request->validate(['mes' => 'required|integer|between:1,12']);
             $filtros['anio'] = $request->anio ?? Carbon::now()->year;
             $filtros['mes'] = $request->mes;
         } else {
