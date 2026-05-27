@@ -1,2 +1,0 @@
-[providers.php]
-aptPackages = ["php-gd"]
