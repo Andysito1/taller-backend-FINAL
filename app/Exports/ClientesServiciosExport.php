@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Exports; // Mantener este namespace
+namespace App\Exports;
 
 use App\Models\OrdenServicio;
 use Maatwebsite\Excel\Concerns\FromQuery;
@@ -11,9 +11,7 @@ use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Color;
-use PhpOffice\PhpSpreadsheet\Style\Border;
 use Maatwebsite\Excel\Events\AfterSheet;
-use Illuminate\Support\Facades\DB;
 
 class ClientesServiciosExport implements FromQuery, WithHeadings, WithMapping, WithEvents, ShouldAutoSize
 {
@@ -90,21 +88,20 @@ class ClientesServiciosExport implements FromQuery, WithHeadings, WithMapping, W
     {
         return [
             AfterSheet::class => function(AfterSheet $event) {
-                // Aplicar el FILTRO solicitado para organizar por Servicio o cualquier columna.
-                // Asumiendo que los encabezados están en la fila 1 y van de la columna A a la J.
                 $headerRange = 'A1:J1';
 
                 $event->sheet->getStyle($headerRange)->applyFromArray([
                     'font' => [
                         'bold' => true,
-                        'color' => ['rgb' => Color::COLOR_WHITE], // Texto blanco
+                        'color' => ['rgb' => Color::COLOR_WHITE],
                     ],
                     'fill' => [
                         'fillType' => Fill::FILL_SOLID,
-                        'color' => ['rgb' => Color::COLOR_BLACK], // Fondo negro
+                        'color' => ['rgb' => Color::COLOR_BLACK],
                     ],
                 ]);
-                $event->sheet->getDelegate()->setAutoFilter('A1:J1');
+                
+                $event->sheet->getDelegate()->setAutoFilter($headerRange);
             },
         ];
     }
