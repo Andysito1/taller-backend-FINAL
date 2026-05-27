@@ -7,6 +7,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Usuario extends Authenticatable
 {
@@ -47,5 +48,20 @@ class Usuario extends Authenticatable
     public function reportesGenerados(): HasMany
     {
         return $this->hasMany(AuditoriaReporte::class, 'id_usuario');
+    }
+
+    public function tipoDocumento(): BelongsTo
+    {
+        return $this->belongsTo(TipoDocumento::class, 'id_tipo_documento');
+    }
+
+    public function cliente(): HasOne
+    {
+        return $this->hasOne(Cliente::class, 'id_usuario');
+    }
+
+    public function mecanico(): HasOne
+    {
+        return $this->hasOne(Mecanico::class, 'id_usuario');
     }
 }

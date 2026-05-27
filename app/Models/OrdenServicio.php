@@ -16,11 +16,11 @@ class OrdenServicio extends Model
     protected $fillable = [
         'id_vehiculo',
         'id_mecanico',
-        'id_servicio', // Nuevo
+        'id_servicio', 
         'titulo',
         'descripcion',
         'estado',
-        'costo_total', // Nuevo
+        'costo_total', 
         'fecha_inicio',
         'fecha_fin',
         'validacion_diagnostico'
@@ -40,6 +40,11 @@ class OrdenServicio extends Model
     public function vehiculo(): BelongsTo
     {
         return $this->belongsTo(Vehiculo::class, 'id_vehiculo');
+    }
+
+    public function mecanico(): BelongsTo
+    {
+        return $this->belongsTo(Usuario::class, 'id_mecanico');
     }
 
     public function etapas(): HasMany
