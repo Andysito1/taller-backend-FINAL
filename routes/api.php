@@ -30,6 +30,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/perfil', [UsuarioController::class, 'perfil']);
     Route::post('/usuarios/fcm-token', [UsuarioController::class, 'updateFcmToken']);
+    // Movida aquí para que cualquier usuario autenticado pueda consultar documentos
+    Route::post('/consulta-documento', [UsuarioController::class, 'consultarDocumento']);
     // Route::post('/send-message', [ChatBotController::class, 'sendMessage']);
 });
 
@@ -45,7 +47,6 @@ Route::middleware(['auth:sanctum', 'role:ADMIN'])->group(function () {
     Route::get('/mecanicos', [UsuarioController::class, 'indexMecanicos']);
     Route::get('/clientes', [ClienteController::class, 'index']);
     Route::get('/roles', [RoleController::class, 'index']);
-    Route::post('/consulta-documento', [UsuarioController::class, 'consultarDocumento']);
     Route::post('/notificaciones', [NotificacionController::class, 'store']);
     Route::get('tipos-documento', [UsuarioController::class, 'indexTiposDocumento']);
     Route::get('servicios-lista', function() { return \App\Models\Servicio::all(); });

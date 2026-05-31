@@ -218,7 +218,7 @@ class UsuarioController extends Controller
         $abreviatura = $tipoDoc->abreviatura;
         $numero = $request->numero;
 
-        if ($abreviatura === 'CE' || $abreviatura === 'PAS') {
+        if (in_array($abreviatura, ['CE', 'PAS'])) {
              return response()->json([
                 'success' => true,
                 'data' => ['nombre' => '', 'direccion' => '']
@@ -227,6 +227,9 @@ class UsuarioController extends Controller
 
         // Token de apis.net.pe
         $token = env('APIS_NET_PE_TOKEN');
+        if (!$token) {
+            return response()->json(['error' => 'Configuración de API incompleta (Token faltante)'], 500);
+        }
 
         $client = new Client(['base_uri' => 'https://api.decolecta.com', 'verify' => false]);
 
@@ -254,7 +257,10 @@ class UsuarioController extends Controller
 
             // Validar si la API retornó error o no encontró datos
             if (isset($response['error']) || empty($response)) {
-                return response()->json(['error' => 'Documento no encontrado'], 404);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El documento no fue encontrado en los registros oficiales.'
+                ], 422); // 422 es más apropiado para errores de semántica/datos
             }
 
             $resultado = [];
