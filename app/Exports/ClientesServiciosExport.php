@@ -24,49 +24,49 @@ class ClientesServiciosExport implements FromQuery, WithHeadings, WithMapping, W
     public function query()
     {
         $query = OrdenServicio::query()
-            ->join('vehiculos', 'ordenes_servicio.id_vehiculo', '=', 'vehiculos.id')
-            ->join('clientes', 'vehiculos.id_cliente', '=', 'clientes.id')
-            ->join('usuarios', 'clientes.id_usuario', '=', 'usuarios.id')
-            ->join('tipos_documento', 'usuarios.id_tipo_documento', '=', 'tipos_documento.id')
-            ->join('servicios', 'ordenes_servicio.id_servicio', '=', 'servicios.id')
+            ->join('vehiculos as v', 'ordenes_servicio.id_vehiculo', '=', 'v.id')
+            ->join('clientes as c', 'v.id_cliente', '=', 'c.id')
+            ->join('usuarios as u', 'c.id_usuario', '=', 'u.id')
+            ->join('tipos_documento as td', 'u.id_tipo_documento', '=', 'td.id')
+            ->join('servicios as s', 'ordenes_servicio.id_servicio', '=', 's.id')
             ->select([
-                'usuarios.nombre as cliente_nombre',
-                'usuarios.correo as cliente_correo',
-                'usuarios.telefono as cliente_telefono',
-                'vehiculos.placa',
-                'vehiculos.marca',
-                'vehiculos.modelo',
-                'servicios.nombre as servicio_nombre',
+                'u.nombre as cliente_nombre',
+                'u.correo as cliente_correo',
+                'u.telefono as cliente_telefono',
+                'v.placa',
+                'v.marca',
+                'v.modelo',
+                's.nombre as servicio_nombre',
                 'ordenes_servicio.costo_total',
                 'ordenes_servicio.fecha_inicio',
                 'ordenes_servicio.estado'
             ]);
 
-        // 1. Filtro por Año (Siempre viene según la validación)
+        // Aplicar filtros dinámicos (Año es obligatorio)
         $query->whereYear('ordenes_servicio.fecha_inicio', $this->filtros['anio']);
 
-        // 2. Filtro de Tiempo Dinámico
-        if ($this->filtros['tipo_filtro'] === 'mes_especifico' && !empty($this->filtros['mes'])) {
+        // Filtro de Tiempo
+        if ($this->filtros['tipo_filtro'] === 'mes_especifico') {
             $query->whereMonth('ordenes_servicio.fecha_inicio', $this->filtros['mes']);
-        } elseif ($this->filtros['tipo_filtro'] === 'rango' && !empty($this->filtros['mes_inicio']) && !empty($this->filtros['mes_fin'])) {
+        } elseif ($this->filtros['tipo_filtro'] === 'rango') {
             $query->whereBetween(DB::raw('MONTH(ordenes_servicio.fecha_inicio)'), [
                 $this->filtros['mes_inicio'],
                 $this->filtros['mes_fin']
             ]);
         }
 
-        // 3. Filtro por Tipo de Cliente (Persona vs Empresa)
+        // Filtro Tipo Cliente
         if (!empty($this->filtros['tipo_cliente'])) {
             if ($this->filtros['tipo_cliente'] === 'persona') {
-                $query->where('tipos_documento.abreviatura', '!=', 'RUC');
-            } elseif ($this->filtros['tipo_cliente'] === 'empresa') {
-                $query->where('tipos_documento.abreviatura', '=', 'RUC');
+                $query->where('td.abreviatura', '!=', 'RUC');
+            } else {
+                $query->where('td.abreviatura', '=', 'RUC');
             }
         }
 
-        // 4. Filtro por Servicios Seleccionados (Array)
+        // Filtro de Servicios (Array)
         if (!empty($this->filtros['servicios'])) {
-            $query->whereIn('servicios.nombre', $this->filtros['servicios']);
+            $query->whereIn('s.nombre', $this->filtros['servicios']);
         }
 
         return $query;
