@@ -13,6 +13,7 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Color;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use Maatwebsite\Excel\Events\AfterSheet;
+use Illuminate\Support\Facades\DB;
 
 class ClientesServiciosExport implements FromQuery, WithHeadings, WithMapping, WithEvents, ShouldAutoSize
 {
@@ -23,9 +24,10 @@ class ClientesServiciosExport implements FromQuery, WithHeadings, WithMapping, W
     public function query()
     {
         $query = OrdenServicio::query()
-            ->leftJoin('vehiculos', 'ordenes_servicio.id_vehiculo', '=', 'vehiculos.id')
-            ->leftJoin('clientes', 'vehiculos.id_cliente', '=', 'clientes.id')
-            ->leftJoin('usuarios', 'clientes.id_usuario', '=', 'usuarios.id')
+            ->join('vehiculos', 'ordenes_servicio.id_vehiculo', '=', 'vehiculos.id')
+            ->join('clientes', 'vehiculos.id_cliente', '=', 'clientes.id')
+            ->join('usuarios', 'clientes.id_usuario', '=', 'usuarios.id')
+            ->join('tipos_documento', 'usuarios.id_tipo_documento', '=', 'tipos_documento.id')
             ->leftJoin('servicios', 'ordenes_servicio.id_servicio', '=', 'servicios.id')
             ->select([
                 'usuarios.nombre as cliente_nombre',
@@ -40,14 +42,31 @@ class ClientesServiciosExport implements FromQuery, WithHeadings, WithMapping, W
                 'ordenes_servicio.estado'
             ]);
 
-        // Aplicar filtros de tiempo
-        if (!empty($this->filtros['fecha_inicio']) && !empty($this->filtros['fecha_fin'])) {
-            $query->whereBetween('ordenes_servicio.fecha_inicio', [$this->filtros['fecha_inicio'], $this->filtros['fecha_fin']]);
-        } elseif (!empty($this->filtros['anio'])) {
-            $query->whereYear('ordenes_servicio.fecha_inicio', $this->filtros['anio']);
-            if (!empty($this->filtros['mes'])) {
-                $query->whereMonth('ordenes_servicio.fecha_inicio', $this->filtros['mes']);
+        // 1. Filtro por Año (Siempre viene según la validación)
+        $query->whereYear('ordenes_servicio.fecha_inicio', $this->filtros['anio']);
+
+        // 2. Filtro de Tiempo Dinámico
+        if ($this->filtros['tipo_filtro'] === 'mes_especifico' && !empty($this->filtros['mes'])) {
+            $query->whereMonth('ordenes_servicio.fecha_inicio', $this->filtros['mes']);
+        } elseif ($this->filtros['tipo_filtro'] === 'rango' && !empty($this->filtros['mes_inicio']) && !empty($this->filtros['mes_fin'])) {
+            $query->whereBetween(DB::raw('MONTH(ordenes_servicio.fecha_inicio)'), [
+                $this->filtros['mes_inicio'],
+                $this->filtros['mes_fin']
+            ]);
+        }
+
+        // 3. Filtro por Tipo de Cliente (Persona vs Empresa)
+        if (!empty($this->filtros['tipo_cliente'])) {
+            if ($this->filtros['tipo_cliente'] === 'persona') {
+                $query->where('tipos_documento.abreviatura', '!=', 'RUC');
+            } elseif ($this->filtros['tipo_cliente'] === 'empresa') {
+                $query->where('tipos_documento.abreviatura', '=', 'RUC');
             }
+        }
+
+        // 4. Filtro por Servicios Seleccionados (Array)
+        if (!empty($this->filtros['servicios'])) {
+            $query->whereIn('ordenes_servicio.titulo', $this->filtros['servicios']);
         }
 
         return $query;
