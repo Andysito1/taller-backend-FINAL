@@ -9,6 +9,7 @@ use App\Models\AuditoriaReporte;
 use Maatwebsite\Excel\Facades\Excel;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class ReporteController extends Controller
 {
@@ -16,33 +17,53 @@ class ReporteController extends Controller
     {
         $request->validate([
             'tipo_filtro' => 'required|in:anio,mes_especifico,rango',
-            'anio' => 'nullable|integer|min:2000',
+            'anio' => 'required|integer|min:2025',
             'mes' => 'nullable|integer|between:1,12',
-            'fecha_inicio' => 'nullable|date',
-            'fecha_fin' => 'nullable|date|after_or_equal:fecha_inicio',
+            'mes_inicio' => 'nullable|integer|between:1,12',
+            'mes_fin' => 'nullable|integer|between:1,12',
+            'tipo_cliente' => 'nullable|string|in:persona,empresa',
+            'servicios' => 'required|array',
+            'servicios.*' => 'string'
         ]);
 
-        $filtros = [];
+        $filtros = $request->all();
         
-        if ($request->tipo_filtro === 'anio') {
-            $filtros['anio'] = $request->anio ?? Carbon::now()->year;
-        } elseif ($request->tipo_filtro === 'mes_especifico') {
-            $request->validate(['mes' => 'required|integer|between:1,12']);
-            $filtros['anio'] = $request->anio ?? Carbon::now()->year;
-            $filtros['mes'] = $request->mes;
-        } else {
-            $filtros['fecha_inicio'] = $request->fecha_inicio;
-            $filtros['fecha_fin'] = $request->fecha_fin;
+        // Constructor de query dinámico para validar existencia de datos
+        $query = DB::table('ordenes_servicio as o')
+            ->join('vehiculos as v', 'o.id_vehiculo', '=', 'v.id')
+            ->join('clientes as c', 'v.id_cliente', '=', 'c.id')
+            ->join('usuarios as u', 'c.id_usuario', '=', 'u.id')
+            ->join('finanza_servicios as f', 'f.id_orden', '=', 'o.id')
+            ->join('tipos_documento as td', 'u.id_tipo_documento', '=', 'td.id')
+            ->whereYear('o.fecha_inicio', $request->anio)
+            ->whereIn('o.titulo', $request->servicios);
+
+        // Aplicar filtros de tiempo dinámicos
+        if ($request->tipo_filtro === 'mes_especifico') {
+            $query->whereMonth('o.fecha_inicio', $request->mes);
+        } elseif ($request->tipo_filtro === 'rango') {
+            $query->whereBetween(DB::raw('MONTH(o.fecha_inicio)'), [$request->mes_inicio, $request->mes_fin]);
+        }
+
+        // Filtro por tipo de cliente (Persona vs Empresa basado en tipo de documento)
+        if ($request->tipo_cliente === 'persona') {
+            $query->where('td.abreviatura', '!=', 'RUC');
+        } elseif ($request->tipo_cliente === 'empresa') {
+            $query->where('td.abreviatura', '=', 'RUC');
+        }
+
+        // Verificar si existen registros antes de procesar el Excel
+        $totalRegistros = $query->count();
+
+        if ($totalRegistros === 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sin registros para los filtros seleccionados'
+            ], 404);
         }
 
         // Generar nombre de archivo único
         $fileName = 'reporte_clientes_servicios_' . now()->format('Ymd_His') . '.xlsx';
-
-        // Auditoría del reporte (usando tu modelo AuditoriaReporte)
-        $export = new ClientesServiciosExport($filtros);
-        
-        // Contar registros antes de exportar para la auditoría
-        $totalRegistros = $export->query()->count();
 
         AuditoriaReporte::create([
             'id_usuario' => Auth::id(),
@@ -52,6 +73,6 @@ class ReporteController extends Controller
             'total_registros' => $totalRegistros,
         ]);
 
-        return Excel::download($export, $fileName);
+        return Excel::download(new ClientesServiciosExport($filtros), $fileName);
     }
 }
