@@ -28,7 +28,7 @@ class ClientesServiciosExport implements FromQuery, WithHeadings, WithMapping, W
             ->join('clientes', 'vehiculos.id_cliente', '=', 'clientes.id')
             ->join('usuarios', 'clientes.id_usuario', '=', 'usuarios.id')
             ->join('tipos_documento', 'usuarios.id_tipo_documento', '=', 'tipos_documento.id')
-            ->leftJoin('servicios', 'ordenes_servicio.id_servicio', '=', 'servicios.id')
+            ->join('servicios', 'ordenes_servicio.id_servicio', '=', 'servicios.id')
             ->select([
                 'usuarios.nombre as cliente_nombre',
                 'usuarios.correo as cliente_correo',
@@ -66,7 +66,7 @@ class ClientesServiciosExport implements FromQuery, WithHeadings, WithMapping, W
 
         // 4. Filtro por Servicios Seleccionados (Array)
         if (!empty($this->filtros['servicios'])) {
-            $query->whereIn('ordenes_servicio.titulo', $this->filtros['servicios']);
+            $query->whereIn('servicios.nombre', $this->filtros['servicios']);
         }
 
         return $query;

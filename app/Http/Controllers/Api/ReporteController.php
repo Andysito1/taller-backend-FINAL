@@ -33,10 +33,10 @@ class ReporteController extends Controller
             ->join('vehiculos as v', 'o.id_vehiculo', '=', 'v.id')
             ->join('clientes as c', 'v.id_cliente', '=', 'c.id')
             ->join('usuarios as u', 'c.id_usuario', '=', 'u.id')
-            ->join('finanza_servicios as f', 'f.id_orden', '=', 'o.id')
+            ->join('servicios as s', 'o.id_servicio', '=', 's.id')
             ->join('tipos_documento as td', 'u.id_tipo_documento', '=', 'td.id')
             ->whereYear('o.fecha_inicio', $request->anio)
-            ->whereIn('o.titulo', $request->servicios);
+            ->whereIn('s.nombre', $request->servicios);
 
         // Aplicar filtros de tiempo dinámicos
         if ($request->tipo_filtro === 'mes_especifico') {
