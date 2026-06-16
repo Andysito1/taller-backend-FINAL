@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use App\Mail\RecoveryCodeMail;
 use App\Mail\WelcomeMail;
 use Carbon\Carbon;
+use App\Models\Cliente;
 use App\Models\Usuario;
 use Laravel\Socialite\Facades\Socialite;
 
@@ -165,12 +166,15 @@ class AuthController extends Controller
                     'google_id' => $googleUser->id,
                     'avatar' => $googleUser->avatar,
                     'id_rol' => 3, // CLIENTE
-                    'id_tipo_documento' => null, // Opcional: podrías asignar uno por defecto si fuera necesario
+                    'id_tipo_documento' => null,
                     'activo' => 1,
                     'password' => null,
                 ]);
 
-                // Enviar correo de bienvenida
+                // 2.1 Crear el registro en la tabla clientes para mantener la integridad
+                Cliente::create(['id_usuario' => $user->id]);
+
+                // 2.2 Enviar correo de bienvenida
                 // Nota: Google ya verificó el correo, por lo que no necesita un código adicional.
                 Mail::to($user->correo)->send(new WelcomeMail($user));
             } else {
