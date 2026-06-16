@@ -27,7 +27,9 @@ class Usuario extends Authenticatable
         'telefono',
         'direccion',
         'id_tipo_documento',
-        'numero_documento'
+        'numero_documento',
+        'google_id',
+        'avatar',
     ];
 
     protected $hidden = [

@@ -9,8 +9,12 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\DB;
 use App\Mail\RecoveryCodeMail;
+use App\Mail\WelcomeMail;
 use Carbon\Carbon;
+use App\Models\Usuario;
+use Laravel\Socialite\Facades\Socialite;
 
 class AuthController extends Controller
 {
@@ -121,5 +125,75 @@ class AuthController extends Controller
             'token' => $token,
             'user' => $user
         ]);
+    }
+
+    /**
+     * Redirige al usuario a la página de autenticación de Google.
+     */
+    public function redirectToGoogle()
+    {
+        /** @var \Laravel\Socialite\Two\AbstractProvider $driver */
+        $driver = Socialite::driver('google');
+        return $driver->stateless()->redirect();
+    }
+
+    /**
+     * Maneja la respuesta de Google después de la autenticación.
+     */
+    public function handleGoogleCallback()
+    {
+        try {
+            /** @var \Laravel\Socialite\Two\AbstractProvider $driver */
+            $driver = Socialite::driver('google');
+            $googleUser = $driver->stateless()->user();
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Error al autenticar con Google.', 'detalle' => $e->getMessage()], 400);
+        }
+
+        DB::beginTransaction();
+        try {
+            // 1. Buscar por google_id o por correo
+            $user = Usuario::where('google_id', $googleUser->id)
+                ->orWhere('correo', $googleUser->email)
+                ->first();
+
+            if (!$user) {
+                // 2. Crear nuevo usuario si no existe
+                $user = Usuario::create([
+                    'nombre' => $googleUser->name,
+                    'correo' => $googleUser->email,
+                    'google_id' => $googleUser->id,
+                    'avatar' => $googleUser->avatar,
+                    'id_rol' => 3, // CLIENTE
+                    'id_tipo_documento' => null, // Opcional: podrías asignar uno por defecto si fuera necesario
+                    'activo' => 1,
+                    'password' => null,
+                ]);
+
+                // Enviar correo de bienvenida
+                // Nota: Google ya verificó el correo, por lo que no necesita un código adicional.
+                Mail::to($user->correo)->send(new WelcomeMail($user));
+            } else {
+                // 3. Actualizar datos si ya existe (vincular)
+                $user->update([
+                    'google_id' => $googleUser->id,
+                    'avatar' => $googleUser->avatar,
+                ]);
+            }
+
+            DB::commit();
+
+            $token = $user->createToken('auth_token')->plainTextToken;
+            
+            return response()->json([
+                'message' => 'Autenticación exitosa',
+                'token' => $token,
+                'user' => $user->load('rol')
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['error' => 'Error al procesar el usuario.', 'detalle' => $e->getMessage()], 500);
+        }
     }
 }

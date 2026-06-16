@@ -21,6 +21,10 @@ Route::get('/sanctum/csrf-cookie', function () {
 
 Route::post('/login', [AuthController::class, 'login']);
 
+// Rutas para Google OAuth
+Route::get('/auth/google', [AuthController::class, 'redirectToGoogle']);
+Route::get('/auth/google/callback', [AuthController::class, 'handleGoogleCallback']);
+
 Route::get('/login', function () {
     return response()->json(['message' => 'No autorizado. Por favor inicie sesión.'], 401);
 })->name('login');
