@@ -194,15 +194,64 @@ class OrdenServicioController extends Controller
     /**
      * Lógica de notificación cuando cambia el estado general de la orden
      */
+    public function notificarAutoListo(Request $request, $id)
+    {
+        $vehiculo = Vehiculo::with(['cliente.usuario', 'ordenes' => function ($query) {
+            $query->latest();
+        }])->findOrFail($id);
+
+        $usuario = $vehiculo->cliente?->usuario;
+
+        if (!$usuario || !$usuario->correo) {
+            return response()->json([
+                'message' => 'El propietario del vehiculo no tiene un correo registrado.',
+            ], 422);
+        }
+
+        $orden = $vehiculo->ordenes->firstWhere('estado', 'finalizado') ?? $vehiculo->ordenes->first();
+
+        if (!$orden) {
+            return response()->json([
+                'message' => 'El vehiculo no tiene una orden de servicio disponible para notificar.',
+            ], 422);
+        }
+
+        if ($orden->estado !== 'finalizado') {
+            $orden->estado = 'finalizado';
+            $orden->fecha_fin = $orden->fecha_fin ?? Carbon::now()->toDateString();
+            $orden->save();
+        }
+
+        try {
+            Mail::to($usuario->correo)->send(new OrderShipped($orden));
+
+            return response()->json([
+                'message' => 'Notificacion de auto listo enviada correctamente.',
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('No se pudo enviar la notificacion de auto listo por SMTP.', [
+                'vehiculo_id' => $vehiculo->id,
+                'orden_id' => $orden->id,
+                'correo' => $usuario->correo,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'No se pudo enviar la notificacion de auto listo.',
+                'detalle' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     private function notificarCambioEstadoOrden($orden)
     {
-        // 2. Enviar Correo vía Resend (Re-incorporado de la primera solicitud)
+        // 2. Enviar correo usando el mailer configurado en .env
         // Asegúrate de que el Mailable OrderShipped ahora usa OrdenServicio
-        if ($orden->vehiculo && $orden->vehiculo->cliente && $orden->vehiculo->cliente->usuario && $orden->vehiculo->cliente->usuario->correo) {
+        if ($orden->estado === 'finalizado' && $orden->vehiculo && $orden->vehiculo->cliente && $orden->vehiculo->cliente->usuario && $orden->vehiculo->cliente->usuario->correo) {
             try {
                 Mail::to($orden->vehiculo->cliente->usuario->correo)->send(new OrderShipped($orden));
             } catch (\Exception $e) {
-                Log::error("Error al enviar email de actualización de orden vía Resend: " . $e->getMessage());
+                Log::error("Error al enviar email de actualizacion de orden por SMTP: " . $e->getMessage());
             }
         }
 

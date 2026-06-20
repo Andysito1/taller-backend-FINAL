@@ -10,11 +10,13 @@ use App\Models\Role;
 use App\Models\TipoDocumento;
 use App\Models\Mecanico;
 use App\Models\Cliente;
+use App\Mail\MarketingReminderMail;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
 class UsuarioController extends Controller
@@ -197,7 +199,7 @@ class UsuarioController extends Controller
     public function enviarRecordatorioCorreo(Request $request, $id)
     {
         $request->validate([
-            'template' => ['nullable', Rule::in(['suave', 'intenso'])],
+            'template' => ['nullable', Rule::in(['suave', 'intenso', 'persuasiva'])],
         ]);
 
         $usuario = Usuario::with('rol')->findOrFail($id);
@@ -216,7 +218,7 @@ class UsuarioController extends Controller
 
         $template = $request->input('template', 'suave');
 
-        $contenido = $template === 'intenso'
+        $contenido = in_array($template, ['intenso', 'persuasiva'], true)
             ? [
                 'asunto' => 'Los mecánicos extrañan tu auto, ¿no quieres arreglar algo?',
                 'titulo' => 'Tu auto merece una visita a Xtreme Performance',
@@ -235,17 +237,19 @@ class UsuarioController extends Controller
         $contenido['cta_url'] = rtrim((string) config('app.frontend_url', config('app.url')), '/') . '/contacto';
 
         try {
-            Mail::send('emails.recordatorio-cliente', [
-                'usuario' => $usuario,
-                'contenido' => $contenido,
-            ], function ($message) use ($usuario, $contenido) {
-                $message->to($usuario->correo)->subject($contenido['asunto']);
-            });
+            Mail::to($usuario->correo)->send(new MarketingReminderMail($usuario, $contenido));
 
             return response()->json([
                 'message' => 'Correo de recordatorio enviado correctamente.',
             ]);
         } catch (\Throwable $e) {
+            Log::error('No se pudo enviar el recordatorio por SMTP.', [
+                'usuario_id' => $usuario->id,
+                'correo' => $usuario->correo,
+                'template' => $template,
+                'error' => $e->getMessage(),
+            ]);
+
             return response()->json([
                 'message' => 'No se pudo enviar el correo de recordatorio.',
                 'detalle' => $e->getMessage(),
@@ -254,6 +258,11 @@ class UsuarioController extends Controller
     }
 
     // Listar solo mecánicos
+    public function enviarRecordatorioMarketing(Request $request, $id)
+    {
+        return $this->enviarRecordatorioCorreo($request, $id);
+    }
+
     public function indexMecanicos()
     {
         // Optimización: Consultamos la tabla mecanicos directamente y traemos los datos del usuario

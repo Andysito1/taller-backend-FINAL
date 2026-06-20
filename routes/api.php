@@ -55,6 +55,8 @@ Route::middleware(['auth:sanctum', 'role:ADMIN'])->group(function () {
     Route::get('/roles', [RoleController::class, 'index']);
     Route::post('/notificaciones', [NotificacionController::class, 'store']);
     Route::post('/clientes/{id}/recordatorio-correo', [UsuarioController::class, 'enviarRecordatorioCorreo']);
+    Route::post('/clientes/{id}/recordatorio-marketing', [UsuarioController::class, 'enviarRecordatorioMarketing']);
+    Route::post('/vehiculos/{id}/notificar-auto-listo', [OrdenServicioController::class, 'notificarAutoListo']);
     Route::get('tipos-documento', [UsuarioController::class, 'indexTiposDocumento']);
     Route::get('servicios-lista', function() { return \App\Models\Servicio::all(); });
     Route::post('reportes/clientes-servicios', [ReporteController::class, 'exportarClientesServicios']);

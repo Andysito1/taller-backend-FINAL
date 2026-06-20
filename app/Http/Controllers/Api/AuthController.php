@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use App\Models\Cliente;
 use App\Models\Usuario;
@@ -92,6 +93,12 @@ class AuthController extends Controller
                 'message' => 'Te enviamos un código de recuperación a tu correo.',
             ]);
         } catch (\Throwable $e) {
+            Log::error('No se pudo enviar el codigo de recuperacion por SMTP.', [
+                'usuario_id' => $user->id,
+                'correo' => $user->correo,
+                'error' => $e->getMessage(),
+            ]);
+
             $user->codigo_recuperacion = null;
             $user->codigo_expira_at = null;
             $user->save();
@@ -144,7 +151,7 @@ class AuthController extends Controller
         ]);
     }
     /**
-     * Genera un código de 6 dígitos y lo envía por Resend
+     * Genera un código de 6 dígitos y lo envía por correo.
      */
     public function enviarCodigoRecuperacion(Request $request)
     {
@@ -164,6 +171,12 @@ class AuthController extends Controller
             Mail::to($user->correo)->send(new RecoveryCodeMail($codigo, $user->nombre));
             return response()->json(['message' => 'Código enviado con éxito a su correo']);
         } catch (\Exception $e) {
+            Log::error('No se pudo enviar el codigo de recuperacion por SMTP.', [
+                'usuario_id' => $user->id,
+                'correo' => $user->correo,
+                'error' => $e->getMessage(),
+            ]);
+
             return response()->json([
                 'error' => 'No se pudo enviar el correo',
                 'detalle' => $e->getMessage()
