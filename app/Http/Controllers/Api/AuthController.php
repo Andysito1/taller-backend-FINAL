@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Mail\PasswordResetMail;
 use App\Mail\RecoveryCodeMail;
 use App\Mail\WelcomeMail;
 use Illuminate\Http\Request;
@@ -13,7 +12,6 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Carbon\Carbon;
 use App\Models\Cliente;
 use App\Models\Usuario;
@@ -82,26 +80,24 @@ class AuthController extends Controller
             ], 404);
         }
 
-        $token = Str::random(64);
-        DB::table('password_reset_tokens')->updateOrInsert(
-            ['email' => $user->correo],
-            [
-                'token' => Hash::make($token),
-                'created_at' => now(),
-            ]
-        );
-        $frontendUrl = rtrim((string) config('app.frontend_url', config('app.url')), '/');
-        $resetUrl = $frontendUrl . '/reset-password?token=' . urlencode($token) . '&email=' . urlencode($user->correo);
+        $codigo = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $user->codigo_recuperacion = $codigo;
+        $user->codigo_expira_at = now()->addMinutes(15);
+        $user->save();
 
         try {
-            Mail::to($user->correo)->send(new PasswordResetMail($user, $resetUrl));
+            Mail::to($user->correo)->send(new RecoveryCodeMail($codigo, $user->nombre));
 
             return response()->json([
-                'message' => 'Te enviamos un correo para continuar con la recuperación de contraseña.',
+                'message' => 'Te enviamos un código de recuperación a tu correo.',
             ]);
         } catch (\Throwable $e) {
+            $user->codigo_recuperacion = null;
+            $user->codigo_expira_at = null;
+            $user->save();
+
             return response()->json([
-                'message' => 'No se pudo enviar el correo de recuperación.',
+                'message' => 'No se pudo enviar el código de recuperación.',
                 'detalle' => $e->getMessage(),
             ], 500);
         }
@@ -111,7 +107,7 @@ class AuthController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'correo' => ['required', 'email'],
-            'token' => ['required', 'string'],
+            'codigo' => ['required', 'string', 'size:6'],
             'password' => ['required', 'min:6', 'confirmed'],
         ]);
 
@@ -122,45 +118,31 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $user = Usuario::where('correo', $request->correo)->first();
+        $user = Usuario::where('correo', $request->correo)
+            ->where('codigo_recuperacion', $request->codigo)
+            ->first();
 
         if (!$user || !$user->activo) {
             return response()->json([
-                'message' => 'No existe una cuenta activa con ese correo.',
-            ], 404);
-        }
-
-        $record = DB::table('password_reset_tokens')
-            ->where('email', $user->correo)
-            ->first();
-
-        if (!$record || !Hash::check($request->token, $record->token)) {
-            return response()->json([
-                'message' => 'El enlace de recuperación no es válido o ya venció.',
+                'message' => 'El código de recuperación no es válido.',
             ], 400);
         }
 
-        $createdAt = Carbon::parse($record->created_at);
-        $expiresInMinutes = (int) config('auth.passwords.users.expire', 60);
-
-        if ($createdAt->addMinutes($expiresInMinutes)->isPast()) {
+        if (!$user->codigo_expira_at || $user->codigo_expira_at->isPast()) {
             return response()->json([
-                'message' => 'El enlace de recuperación ya venció.',
+                'message' => 'El código de recuperación ya venció.',
             ], 400);
         }
 
         $user->password = Hash::make($request->password);
+        $user->codigo_recuperacion = null;
+        $user->codigo_expira_at = null;
         $user->save();
-
-        DB::table('password_reset_tokens')
-            ->where('email', $user->correo)
-            ->delete();
 
         return response()->json([
             'message' => 'Tu contraseña fue actualizada correctamente.',
         ]);
     }
-
     /**
      * Genera un código de 6 dígitos y lo envía por Resend
      */
