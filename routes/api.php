@@ -20,6 +20,8 @@ Route::get('/sanctum/csrf-cookie', function () {
 });
 
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
 // Rutas para Google OAuth
 Route::get('/auth/google', [AuthController::class, 'redirectToGoogle']);
@@ -52,6 +54,7 @@ Route::middleware(['auth:sanctum', 'role:ADMIN'])->group(function () {
     Route::get('/clientes', [ClienteController::class, 'index']);
     Route::get('/roles', [RoleController::class, 'index']);
     Route::post('/notificaciones', [NotificacionController::class, 'store']);
+    Route::post('/clientes/{id}/recordatorio-correo', [UsuarioController::class, 'enviarRecordatorioCorreo']);
     Route::get('tipos-documento', [UsuarioController::class, 'indexTiposDocumento']);
     Route::get('servicios-lista', function() { return \App\Models\Servicio::all(); });
     Route::post('reportes/clientes-servicios', [ReporteController::class, 'exportarClientesServicios']);

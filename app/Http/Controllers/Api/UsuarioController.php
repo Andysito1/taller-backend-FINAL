@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\Rule;
 
 class UsuarioController extends Controller
 {
@@ -190,6 +192,65 @@ class UsuarioController extends Controller
             'message' => 'Estado actualizado',
             'activo' => $usuario->activo
         ]);
+    }
+
+    public function enviarRecordatorioCorreo(Request $request, $id)
+    {
+        $request->validate([
+            'template' => ['nullable', Rule::in(['suave', 'intenso'])],
+        ]);
+
+        $usuario = Usuario::with('rol')->findOrFail($id);
+
+        if (!$usuario->correo) {
+            return response()->json([
+                'message' => 'El cliente no tiene un correo registrado.',
+            ], 422);
+        }
+
+        if (!$usuario->rol || $usuario->rol->nombre !== 'CLIENTE') {
+            return response()->json([
+                'message' => 'Solo se pueden enviar recordatorios a clientes.',
+            ], 422);
+        }
+
+        $template = $request->input('template', 'suave');
+
+        $contenido = $template === 'intenso'
+            ? [
+                'asunto' => 'Los mecánicos extrañan tu auto, ¿no quieres arreglar algo?',
+                'titulo' => 'Tu auto merece una visita a Xtreme Performance',
+                'subtitulo' => 'Los mecánicos extrañan tu auto y nosotros queremos verlo de nuevo en el taller.',
+                'mensaje' => 'Si notas algún ruido, vibración o simplemente quieres una mejora, este es el momento ideal para traerlo.',
+                'cta_texto' => 'Agendar revisión',
+            ]
+            : [
+                'asunto' => '¿No te hace falta alguna mejora?',
+                'titulo' => 'Tu siguiente mejora está esperándote',
+                'subtitulo' => 'En Xtreme Performance siempre hay una mejora posible para tu vehículo.',
+                'mensaje' => 'Aprovecha para revisar rendimiento, seguridad o estética y vuelve a sentir la diferencia.',
+                'cta_texto' => 'Ver opciones de mejora',
+            ];
+
+        $contenido['cta_url'] = rtrim((string) config('app.frontend_url', config('app.url')), '/') . '/contacto';
+
+        try {
+            Mail::send('emails.recordatorio-cliente', [
+                'usuario' => $usuario,
+                'contenido' => $contenido,
+            ], function ($message) use ($usuario, $contenido) {
+                $message->to($usuario->correo)->subject($contenido['asunto']);
+            });
+
+            return response()->json([
+                'message' => 'Correo de recordatorio enviado correctamente.',
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'No se pudo enviar el correo de recordatorio.',
+                'detalle' => $e->getMessage(),
+            ], 500);
+        }
     }
 
     // Listar solo mecánicos

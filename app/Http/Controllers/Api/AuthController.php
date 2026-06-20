@@ -3,6 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\PasswordResetMail;
+use App\Mail\RecoveryCodeMail;
+use App\Mail\WelcomeMail;
 use Illuminate\Http\Request;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Support\Facades\Auth;
@@ -10,8 +13,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\DB;
-use App\Mail\RecoveryCodeMail;
-use App\Mail\WelcomeMail;
+use Illuminate\Support\Str;
 use Carbon\Carbon;
 use App\Models\Cliente;
 use App\Models\Usuario;
@@ -56,6 +58,106 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Sesión cerrada correctamente'
+        ]);
+    }
+
+    public function forgotPassword(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'correo' => ['required', 'email'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'El correo es obligatorio y debe ser válido.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $user = Usuario::where('correo', $request->correo)->first();
+
+        if (!$user || !$user->activo) {
+            return response()->json([
+                'message' => 'No existe una cuenta activa con ese correo.',
+            ], 404);
+        }
+
+        $token = Str::random(64);
+        DB::table('password_reset_tokens')->updateOrInsert(
+            ['email' => $user->correo],
+            [
+                'token' => Hash::make($token),
+                'created_at' => now(),
+            ]
+        );
+        $frontendUrl = rtrim((string) config('app.frontend_url', config('app.url')), '/');
+        $resetUrl = $frontendUrl . '/reset-password?token=' . urlencode($token) . '&email=' . urlencode($user->correo);
+
+        try {
+            Mail::to($user->correo)->send(new PasswordResetMail($user, $resetUrl));
+
+            return response()->json([
+                'message' => 'Te enviamos un correo para continuar con la recuperación de contraseña.',
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'No se pudo enviar el correo de recuperación.',
+                'detalle' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function resetPassword(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'correo' => ['required', 'email'],
+            'token' => ['required', 'string'],
+            'password' => ['required', 'min:6', 'confirmed'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Revisa los datos enviados.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $user = Usuario::where('correo', $request->correo)->first();
+
+        if (!$user || !$user->activo) {
+            return response()->json([
+                'message' => 'No existe una cuenta activa con ese correo.',
+            ], 404);
+        }
+
+        $record = DB::table('password_reset_tokens')
+            ->where('email', $user->correo)
+            ->first();
+
+        if (!$record || !Hash::check($request->token, $record->token)) {
+            return response()->json([
+                'message' => 'El enlace de recuperación no es válido o ya venció.',
+            ], 400);
+        }
+
+        $createdAt = Carbon::parse($record->created_at);
+        $expiresInMinutes = (int) config('auth.passwords.users.expire', 60);
+
+        if ($createdAt->addMinutes($expiresInMinutes)->isPast()) {
+            return response()->json([
+                'message' => 'El enlace de recuperación ya venció.',
+            ], 400);
+        }
+
+        $user->password = Hash::make($request->password);
+        $user->save();
+
+        DB::table('password_reset_tokens')
+            ->where('email', $user->correo)
+            ->delete();
+
+        return response()->json([
+            'message' => 'Tu contraseña fue actualizada correctamente.',
         ]);
     }
 
