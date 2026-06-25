@@ -19,7 +19,7 @@ class ChatBotResponse implements ShouldBroadcast
     public function __construct($message)
     {
         // Aquí puedes procesar la lógica simple del bot
-        $this->message = "El bot dice: " . $message;
+        $this->message = $message;
     }
 
     public function broadcastOn()
