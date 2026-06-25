@@ -1,0 +1,54 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use App\Events\ChatBotResponse; // Tu evento de la imagen image_05de06.png
+
+class ChatController extends Controller
+{
+    public function handleUserMessage(Request $request)
+    {
+        $prompt = $request->input('message');
+
+        // Para pruebas rápidas puedes dejarlo directo; para producción es mejor meterlo en un Job (Queue)
+        $this->processAiResponse($prompt);
+
+        return response()->json(['status' => 'Procesando mensaje...']);
+    }
+
+    private function processAiResponse($prompt)
+    {
+        try {
+            // 1. Obtener herramientas de tu servidor FastMCP en Vercel
+            // (La URL que creamos en el paso anterior)
+            $mcpTools = Http::get('https://tu-mecanica-mcp.vercel.app/mcp/tools')->json();
+
+            // 2. Enviar prompt + herramientas a Ollama Cloud usando tu API Key (image_533f5b.png)
+            $response = Http::withToken(config('services.ollama.key'))
+                ->post(config('services.ollama.url'), [
+                    'model' => 'openclaw', // El modelo activo en tu panel de Ollama
+                    'messages' => [['role' => 'user', 'content' => $prompt]],
+                    'tools' => $mcpTools,
+                    'stream' => false
+                ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                $aiText = $data['choices'][0]['message']['content'] ?? 'No se pudo generar respuesta.';
+
+                // 3. ¡AQUÍ INTEGRAS TU CÓDIGO! 
+                // Transmitir la respuesta final por WebSockets usando tu evento existente
+                broadcast(new ChatBotResponse($aiText))->toOthers();
+            } else {
+                broadcast(new ChatBotResponse("Lo siento, tuve un problema al conectarme al cerebro de IA."))->toOthers();
+            }
+
+        } catch (\Exception $e) {
+            // En caso de error de conexión con Vercel o la BD en Railway
+            broadcast(new ChatBotResponse("Error interno al procesar tu consulta automotriz."))->toOthers();
+        }
+    }
+}
