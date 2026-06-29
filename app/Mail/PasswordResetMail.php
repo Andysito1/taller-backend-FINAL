@@ -2,17 +2,13 @@
 
 namespace App\Mail;
 
+use App\Mail\BrevoMailable;
 use App\Models\Usuario;
-use Illuminate\Bus\Queueable;
-use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
-use Illuminate\Queue\SerializesModels;
 
-class PasswordResetMail extends Mailable
+class PasswordResetMail extends BrevoMailable
 {
-    use Queueable, SerializesModels;
-
     public function __construct(
         public Usuario $usuario,
         public string $resetUrl
@@ -33,3 +29,4 @@ class PasswordResetMail extends Mailable
         );
     }
 }
+

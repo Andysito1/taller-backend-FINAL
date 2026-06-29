@@ -2,17 +2,13 @@
 
 namespace App\Mail;
 
+use App\Mail\BrevoMailable;
 use App\Models\Usuario;
-use Illuminate\Bus\Queueable;
-use Illuminate\Mail\Mailable; 
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
-use Illuminate\Queue\SerializesModels;
 
-class WelcomeMail extends Mailable
+class WelcomeMail extends BrevoMailable
 {
-    use Queueable, SerializesModels;
-
     public function __construct(public Usuario $usuario)
     {
     }
@@ -27,7 +23,8 @@ class WelcomeMail extends Mailable
     public function content(): Content
     {
         return new Content(
-            view: 'emails.welcome', // Asegúrate de crear esta vista en resources/views/emails/welcome.blade.php
+            view: 'emails.welcome',
         );
     }
 }
+

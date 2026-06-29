@@ -12,12 +12,15 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
+use App\Services\BrevoMailer;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Socialite\Facades\Socialite;
 
 class AuthController extends Controller
 {
+    public function __construct(protected BrevoMailer $brevoMailer)
+    {
+    }
     public function login(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -82,7 +85,7 @@ class AuthController extends Controller
         $user->save();
 
         try {
-            Mail::to($user->correo)->send(new RecoveryCodeMail($codigo, $user->nombre));
+            $this->brevoMailer->sendMailable($user->correo, new RecoveryCodeMail($codigo, $user->nombre));
 
             return response()->json([
                 'message' => 'Te enviamos un codigo de recuperacion a tu correo.',
@@ -193,7 +196,7 @@ class AuthController extends Controller
         $user->save();
 
         try {
-            Mail::to($user->correo)->send(new RecoveryCodeMail($codigo, $user->nombre));
+            $this->brevoMailer->sendMailable($user->correo, new RecoveryCodeMail($codigo, $user->nombre));
 
             return response()->json(['message' => 'Codigo enviado con exito a su correo']);
         } catch (\Throwable $e) {
@@ -279,7 +282,7 @@ class AuthController extends Controller
                 ]);
 
                 Cliente::create(['id_usuario' => $user->id]);
-                Mail::to($user->correo)->send(new WelcomeMail($user));
+                $this->brevoMailer->sendMailable($user->correo, new WelcomeMail($user));
             } else {
                 $user->update([
                     'google_id' => $googleUser->id,

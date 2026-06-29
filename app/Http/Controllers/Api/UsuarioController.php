@@ -3,24 +3,27 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Usuario;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
+use App\Mail\MarketingReminderMail;
+use App\Models\Cliente;
+use App\Models\Mecanico;
 use App\Models\Role;
 use App\Models\TipoDocumento;
-use App\Models\Mecanico;
-use App\Models\Cliente;
-use App\Mail\MarketingReminderMail;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
-use GuzzleHttp\Client;
+use App\Models\Usuario;
+use App\Services\BrevoMailer;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\Rule;
+use GuzzleHttp\Client;
 
 class UsuarioController extends Controller
 {
+    public function __construct(protected BrevoMailer $brevoMailer)
+    {
+    }
     // Listar usuarios
     public function index()
     {
@@ -237,7 +240,7 @@ class UsuarioController extends Controller
         $contenido['cta_url'] = rtrim((string) config('app.frontend_url', config('app.url')), '/') . '/contacto';
 
         try {
-            Mail::to($usuario->correo)->send(new MarketingReminderMail($usuario, $contenido));
+            $this->brevoMailer->sendMailable($usuario->correo, new MarketingReminderMail($usuario, $contenido));
 
             return response()->json([
                 'message' => 'Correo de recordatorio enviado correctamente.',

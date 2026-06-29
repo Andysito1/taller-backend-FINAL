@@ -3,26 +3,26 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\OrderShipped;
 use App\Models\OrdenServicio;
 use App\Models\EtapaServicio;
 use App\Models\Vehiculo;
 use Illuminate\Http\Request;
 use App\Models\Notificacion;
 use App\Models\ConfiguracionUsuario;
+use App\Services\BrevoMailer;
 use App\Services\FcmService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Mail; // Asegúrate de que apunte al Facade
-use App\Mail\OrderShipped;
 use Carbon\Carbon;
 
 class OrdenServicioController extends Controller
 {
     /**
-     * Inyectar servicio de notificaciones Push
+     * Inyectar servicio de notificaciones Push y Brevo
      */
-    public function __construct(protected FcmService $fcmService)
+    public function __construct(protected FcmService $fcmService, protected BrevoMailer $brevoMailer)
     {
     }
 
@@ -223,7 +223,7 @@ class OrdenServicioController extends Controller
         }
 
         try {
-            Mail::to($usuario->correo)->send(new OrderShipped($orden));
+            $this->brevoMailer->sendMailable($usuario->correo, new OrderShipped($orden));
 
             return response()->json([
                 'message' => 'Notificacion de auto listo enviada correctamente.',
@@ -249,9 +249,9 @@ class OrdenServicioController extends Controller
         // Asegúrate de que el Mailable OrderShipped ahora usa OrdenServicio
         if ($orden->estado === 'finalizado' && $orden->vehiculo && $orden->vehiculo->cliente && $orden->vehiculo->cliente->usuario && $orden->vehiculo->cliente->usuario->correo) {
             try {
-                Mail::to($orden->vehiculo->cliente->usuario->correo)->send(new OrderShipped($orden));
+                $this->brevoMailer->sendMailable($orden->vehiculo->cliente->usuario->correo, new OrderShipped($orden));
             } catch (\Exception $e) {
-                Log::error("Error al enviar email de actualizacion de orden por SMTP: " . $e->getMessage());
+                Log::error("Error al enviar email de actualizacion de orden por Brevo: " . $e->getMessage());
             }
         }
 

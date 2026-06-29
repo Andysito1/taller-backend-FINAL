@@ -2,16 +2,12 @@
 
 namespace App\Mail;
 
-use Illuminate\Bus\Queueable;
-use Illuminate\Mail\Mailable;
+use App\Mail\BrevoMailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
-use Illuminate\Queue\SerializesModels;
 
-class RecoveryCodeMail extends Mailable
+class RecoveryCodeMail extends BrevoMailable
 {
-    use Queueable, SerializesModels;
-
     public function __construct(public string $codigo, public string $nombreUsuario) {}
 
     public function envelope(): Envelope
@@ -32,3 +28,4 @@ class RecoveryCodeMail extends Mailable
         );
     }
 }
+
