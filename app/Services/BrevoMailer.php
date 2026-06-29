@@ -11,9 +11,9 @@ class BrevoMailer
 {
     public function sendRawEmail(array $payload): array
     {
-        $apiKey = env('BREVO_API_KEY');
+        $apiKey = config('services.brevo.api_key');
         if (! $apiKey) {
-            throw new \RuntimeException('BREVO_API_KEY no está configurada en el .env');
+            throw new \RuntimeException('no está configurada en el .env');
         }
 
         $to = $payload['to'] ?? null;
