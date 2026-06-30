@@ -243,6 +243,44 @@ class OrdenServicioController extends Controller
         }
     }
 
+    public function notificarServicioCompletado($id)
+    {
+        $orden = OrdenServicio::with(['vehiculo.cliente.usuario'])->findOrFail($id);
+
+        if ($orden->estado !== 'finalizado') {
+            return response()->json([
+                'message' => 'Solo se pueden enviar correos para órdenes ya finalizadas.',
+            ], 422);
+        }
+
+        $usuario = $orden->vehiculo?->cliente?->usuario;
+
+        if (!$usuario || !$usuario->correo) {
+            return response()->json([
+                'message' => 'El propietario del vehículo no tiene un correo registrado.',
+            ], 422);
+        }
+
+        try {
+            $this->brevoMailer->sendMailable($usuario->correo, new OrderShipped($orden));
+
+            return response()->json([
+                'message' => 'Correo de servicio completado enviado correctamente.',
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('No se pudo enviar el correo de servicio completado.', [
+                'orden_id' => $orden->id,
+                'correo' => $usuario->correo,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'No se pudo enviar el correo de servicio completado.',
+                'detalle' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     private function notificarCambioEstadoOrden($orden)
     {
         // 2. Enviar correo usando el mailer configurado en .env
