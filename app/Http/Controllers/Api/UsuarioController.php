@@ -205,7 +205,19 @@ class UsuarioController extends Controller
             'template' => ['nullable', Rule::in(['suave', 'intenso', 'persuasiva'])],
         ]);
 
-        $usuario = Usuario::with('rol')->findOrFail($id);
+        $usuario = Usuario::with('rol')->find($id);
+
+        if (!$usuario) {
+            $cliente = Cliente::with('usuario.rol')->find($id);
+            $usuario = $cliente?->usuario;
+        }
+
+        if (!$usuario) {
+            return response()->json([
+                'message' => 'No se encontró un cliente o usuario válido para enviar el recordatorio.',
+                'received_id' => $id,
+            ], 404);
+        }
 
         if (!$usuario->correo) {
             return response()->json([
