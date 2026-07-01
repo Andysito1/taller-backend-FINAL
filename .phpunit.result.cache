@@ -1,1 +1,1 @@
-{"version":2,"defects":[],"times":{"Tests\\Unit\\ExampleTest::test_that_true_is_true":0.004,"Tests\\Feature\\ExampleTest::test_the_application_returns_a_successful_response":0.043}}
+{"version":2,"defects":{"Tests\\Feature\\ChatbotControllerTest::test_it_returns_a_chatbot_reply_from_groq":7},"times":{"Tests\\Unit\\ExampleTest::test_that_true_is_true":0.004,"Tests\\Feature\\ExampleTest::test_the_application_returns_a_successful_response":0.043,"Tests\\Feature\\ChatbotControllerTest::test_it_returns_a_chatbot_reply_from_groq":2.382}}

@@ -14,11 +14,13 @@ use App\Http\Controllers\Api\SeguimientoController;
 use App\Http\Controllers\Api\ConfiguracionUsuarioController;
 use App\Http\Controllers\Api\NotificacionController;
 use App\Http\Controllers\Api\ReporteController;
+use App\Http\Controllers\Api\ChatbotController;
 
 Route::get('/sanctum/csrf-cookie', function () {
     return response()->json(['csrf' => 'ok']);
 });
 
+Route::post('/chatbot/message', [ChatbotController::class, 'message']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
 Route::post('/verify-reset-code', [AuthController::class, 'verifyResetCode']);
