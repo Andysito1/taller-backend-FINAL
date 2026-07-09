@@ -29,7 +29,10 @@ RUN apk add --no-cache \
     unzip \
     oniguruma-dev \
     libzip-dev \
-    && docker-php-ext-install pdo pdo_mysql mbstring zip
+    freetype-dev \
+    libpng-dev \
+    libjpeg-turbo-dev \
+    && docker-php-ext-install pdo pdo_mysql mbstring zip gd
 
 WORKDIR /var/www/html
 
@@ -49,7 +52,10 @@ RUN apk add --no-cache \
     bash \
     oniguruma-dev \
     libzip-dev \
-    && docker-php-ext-install pdo pdo_mysql mbstring zip
+    freetype-dev \
+    libpng-dev \
+    libjpeg-turbo-dev \
+    && docker-php-ext-install pdo pdo_mysql mbstring zip gd
 
 WORKDIR /var/www/html
 
