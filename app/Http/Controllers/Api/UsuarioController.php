@@ -27,7 +27,7 @@ class UsuarioController extends Controller
     // Listar usuarios
     public function index()
     {
-        $usuarios = Usuario::with(['rol', 'tipoDocumento'])->get();
+        $usuarios = Usuario::with(['rol', 'tipoDocumento', 'mecanico'])->get();
 
         return response()->json($usuarios);
     }
@@ -43,12 +43,15 @@ class UsuarioController extends Controller
     {
         $request->validate([
             'nombre' => 'required|string|max:255', // Aumentamos a 255 por si es Razón Social larga
-            'correo' => 'required|email|unique:usuarios,correo',
+            'correo' => ['required', 'email', 'unique:usuarios,correo', 'regex:/^[^\s@]+@gmail\.com$/i'],
             'password' => 'required|min:6',
             'id_rol' => 'required|exists:roles,id',
-            'telefono' => 'nullable|string',
+            'telefono' => 'nullable|string|regex:/^[0-9]+$/',
             'direccion' => 'nullable|string',
             'especialidad' => 'nullable|string' // Opcional para mecánicos
+        ], [
+            'correo.regex' => 'El correo electrónico debe ser una cuenta de Gmail (usuario@gmail.com).',
+            'telefono.regex' => 'El teléfono solo puede contener números.',
         ]);
 
         // Verificar roles
@@ -149,26 +152,30 @@ class UsuarioController extends Controller
             'nombre' => 'required|string|max:255',
             'correo' => 'required|email|unique:usuarios,correo,' . $id,
             'id_rol' => 'required|exists:roles,id',
-            'password' => 'nullable|min:6'
+            'password' => 'nullable|min:6',
+            'telefono' => 'nullable|string|regex:/^[0-9]+$/',
+        ], [
+            'telefono.regex' => 'El teléfono solo puede contener números.',
         ]);
 
         $data = $request->only(['nombre', 'correo', 'id_rol', 'telefono', 'direccion', 'id_tipo_documento', 'numero_documento']);
-        
+
         if ($request->filled('password')) {
             $data['password'] = Hash::make($request->password);
         }
 
         $usuario->update($data);
 
-        // Si es mecánico, actualizar especialidad
-        if ($usuario->id_rol == 2) { // Asumiendo 2 es MECANICO
+        // Si el rol asignado es MECANICO, actualizar/crear su especialidad
+        $rol = Role::find($usuario->id_rol);
+        if ($rol && $rol->nombre === 'MECANICO') {
             Mecanico::updateOrCreate(
                 ['id_usuario' => $usuario->id],
                 ['especialidad' => $request->especialidad ?? 'General']
             );
         }
 
-        return response()->json(['message' => 'Usuario actualizado', 'usuario' => $usuario->load('rol')]);
+        return response()->json(['message' => 'Usuario actualizado', 'usuario' => $usuario->load(['rol', 'tipoDocumento', 'mecanico'])]);
     }
 
     // Eliminar usuario

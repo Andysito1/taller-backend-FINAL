@@ -31,7 +31,7 @@ class OrdenServicioController extends Controller
      */
     public function index()
     {
-        $ordenes = OrdenServicio::with(['vehiculo.cliente.usuario', 'mecanico', 'etapas', 'servicio'])
+        $ordenes = OrdenServicio::with(['vehiculo.cliente.usuario', 'mecanico', 'etapas', 'servicio', 'finanzas'])
             ->latest()
             ->get();
         return response()->json($ordenes);
@@ -50,6 +50,9 @@ class OrdenServicioController extends Controller
             'descripcion'  => 'required|string',
             'fecha_inicio' => 'required|date',
             'costo_total'  => 'nullable|numeric|min:0', // Nuevo campo, puede ser nulo al inicio
+            'concepto_finanza' => 'nullable|string|max:100',
+            'tipo_finanza' => 'nullable|in:base,adicional',
+            'monto_finanza' => 'nullable|numeric|min:0',
         ]);
 
         // Verificar si el vehículo ya tiene una orden activa
@@ -60,6 +63,10 @@ class OrdenServicioController extends Controller
         if ($ordenActiva) {
             return response()->json(['error' => 'El vehículo ya tiene una orden de servicio en curso.'], 422);
         }
+
+        // El detalle financiero inicial puede llegar como monto_finanza (formulario detallado)
+        // o como costo_total (compatibilidad con integraciones previas / app móvil)
+        $montoInicial = $request->monto_finanza ?? $request->costo_total ?? 0.00;
 
         DB::beginTransaction();
         try {
@@ -72,17 +79,17 @@ class OrdenServicioController extends Controller
                 'descripcion'  => $request->descripcion,
                 'fecha_inicio' => $request->fecha_inicio,
                 'estado'       => 'en_proceso',
-                'costo_total'  => $request->costo_total ?? 0.00, // Establecer costo inicial
+                'costo_total'  => $montoInicial, // Establecer costo inicial
                 'validacion_diagnostico' => 'en_espera'
             ]);
 
             // Registro del costo base inicial en la tabla de finanzas para consistencia
-            if ($orden->costo_total > 0) {
+            if ($montoInicial > 0) {
                 \App\Models\FinanzaServicio::create([
                     'id_orden' => $orden->id,
-                    'concepto' => 'Costo Base de Servicio',
-                    'tipo' => 'base',
-                    'monto' => $orden->costo_total
+                    'concepto' => $request->concepto_finanza ?: 'Costo Base de Servicio',
+                    'tipo' => $request->tipo_finanza ?: 'base',
+                    'monto' => $montoInicial
                 ]);
             }
 
@@ -111,7 +118,7 @@ class OrdenServicioController extends Controller
      */
     public function show($id)
     {
-        $orden = OrdenServicio::with(['vehiculo.cliente.usuario', 'mecanico', 'etapas', 'servicio'])
+        $orden = OrdenServicio::with(['vehiculo.cliente.usuario', 'mecanico', 'etapas', 'servicio', 'finanzas'])
             ->findOrFail($id);
         return response()->json($orden);
     }
