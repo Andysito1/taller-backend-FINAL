@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class EtapaServicio extends Model
 {
@@ -20,5 +21,10 @@ class EtapaServicio extends Model
     public function orden()
     {
         return $this->belongsTo(OrdenServicio::class, 'id_orden');
+    }
+
+    public function evidencias(): HasMany
+    {
+        return $this->hasMany(EvidenciaServicio::class, 'id_etapa');
     }
 }

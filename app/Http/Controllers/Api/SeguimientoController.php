@@ -21,7 +21,7 @@ class SeguimientoController extends Controller
         // Usamos 'latest()' para obtener la última creada.
         // Si quisieras filtrar solo las activas, podrías agregar ->where('estado', 'en_proceso')
         $orden = OrdenServicio::where('id_vehiculo', $id_vehiculo)->with('servicio')
-                    ->with('etapas') // Cargar la relación de etapas
+                    ->with('etapas.evidencias') // Cargar etapas y sus evidencias
                     ->latest('id') // Aseguramos que sea por el ID más alto (el más reciente)
                     ->first();
 
@@ -41,6 +41,12 @@ class SeguimientoController extends Controller
                 'estado' => $this->formatEstado($etapa->estado),
                 'fecha' => $etapa->updated_at ? $etapa->updated_at->format('d M, Y - H:i') : null,
                 'tipo' => strtoupper($etapa->etapa), // DIAGNOSTICO, REPARACION, PRUEBAS, FINALIZACION
+                'evidencias' => $etapa->evidencias->map(fn($e) => [
+                    'id' => $e->id,
+                    'tipo' => $e->tipo,
+                    'url' => $e->url,
+                    'descripcion' => $e->descripcion,
+                ]),
             ];
         });
 

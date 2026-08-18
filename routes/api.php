@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\ConfiguracionUsuarioController;
 use App\Http\Controllers\Api\NotificacionController;
 use App\Http\Controllers\Api\ReporteController;
 use App\Http\Controllers\Api\ChatbotController;
+use App\Http\Controllers\Api\EvidenciaServicioController;
 
 Route::get('/sanctum/csrf-cookie', function () {
     return response()->json(['csrf' => 'ok']);
@@ -42,6 +43,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Movida aquí para que cualquier usuario autenticado pueda consultar documentos
     Route::post('/consulta-documento', [UsuarioController::class, 'consultarDocumento']);
     // Route::post('/send-message', [ChatBotController::class, 'sendMessage']);
+
+    // Evidencias de servicio: la autorización fina (rol + pertenencia) se valida dentro del controlador
+    Route::get('/etapa-servicio/{id}/evidencias', [EvidenciaServicioController::class, 'index']);
 });
 
 // Rutas para Administradores
@@ -108,4 +112,6 @@ Route::middleware(['auth:sanctum', 'role:ADMIN,MECANICO'])->group(function () {
     Route::delete('/vehiculos/{id}', [VehiculoController::class, 'destroy']);
     Route::patch('/etapa-servicio/{id}', [EtapaServicioController::class, 'update']);
     Route::post('/finanzas', [FinanzaServicioController::class, 'store']);
+    Route::post('/etapa-servicio/{id}/evidencias', [EvidenciaServicioController::class, 'store']);
+    Route::delete('/evidencias/{id}', [EvidenciaServicioController::class, 'destroy']);
 });

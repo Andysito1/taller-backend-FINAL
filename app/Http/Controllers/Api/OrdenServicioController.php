@@ -31,7 +31,7 @@ class OrdenServicioController extends Controller
      */
     public function index()
     {
-        $ordenes = OrdenServicio::with(['vehiculo.cliente.usuario', 'mecanico', 'etapas', 'servicio', 'finanzas'])
+        $ordenes = OrdenServicio::with(['vehiculo.cliente.usuario', 'mecanico', 'etapas.evidencias', 'servicio', 'finanzas'])
             ->latest()
             ->get();
         return response()->json($ordenes);
@@ -118,7 +118,7 @@ class OrdenServicioController extends Controller
      */
     public function show($id)
     {
-        $orden = OrdenServicio::with(['vehiculo.cliente.usuario', 'mecanico', 'etapas', 'servicio', 'finanzas'])
+        $orden = OrdenServicio::with(['vehiculo.cliente.usuario', 'mecanico', 'etapas.evidencias', 'servicio', 'finanzas'])
             ->findOrFail($id);
         return response()->json($orden);
     }
@@ -130,7 +130,7 @@ class OrdenServicioController extends Controller
     {
         $user = Auth::user();
         $ordenes = OrdenServicio::where('id_mecanico', $user->id)
-            ->with(['vehiculo.cliente.usuario', 'etapas', 'servicio'])
+            ->with(['vehiculo.cliente.usuario', 'etapas.evidencias', 'servicio'])
             ->latest()
             ->get();
         return response()->json($ordenes);
@@ -142,7 +142,7 @@ class OrdenServicioController extends Controller
     public function seguimientoVehiculo($id_vehiculo)
     {
         $orden = OrdenServicio::where('id_vehiculo', $id_vehiculo)
-            ->with(['etapas', 'servicio'])
+            ->with(['etapas.evidencias', 'servicio'])
             ->latest()
             ->first();
 
