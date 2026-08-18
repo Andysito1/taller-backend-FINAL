@@ -254,12 +254,14 @@ class AuthController extends Controller
 
     public function handleGoogleCallback()
     {
+        $frontendUrl = rtrim(env('FRONTEND_URL', 'https://taller-frontend-six.vercel.app'), '/');
+
         try {
             /** @var \Laravel\Socialite\Two\AbstractProvider $driver */
             $driver = Socialite::driver('google');
             $googleUser = $driver->stateless()->user();
         } catch (\Exception $e) {
-            return response()->json(['error' => 'Error al autenticar con Google.', 'detalle' => $e->getMessage()], 400);
+            return redirect()->away("{$frontendUrl}/login?error=google_auth_failed");
         }
 
         DB::beginTransaction();
@@ -292,15 +294,16 @@ class AuthController extends Controller
 
             DB::commit();
 
-            return response()->json([
-                'message' => 'Autenticacion exitosa',
-                'token' => $user->createToken('auth_token')->plainTextToken,
-                'user' => $user->load('rol'),
-            ]);
+            $token = $user->createToken('auth_token')->plainTextToken;
+
+            // Este endpoint lo visita el navegador (redirección desde Google), no el
+            // SPA vía fetch/XHR, así que debe redirigir de vuelta al frontend con el
+            // token en la URL en vez de devolver JSON crudo.
+            return redirect()->away("{$frontendUrl}/auth/callback?token={$token}");
         } catch (\Exception $e) {
             DB::rollBack();
 
-            return response()->json(['error' => 'Error al procesar el usuario.', 'detalle' => $e->getMessage()], 500);
+            return redirect()->away("{$frontendUrl}/login?error=google_auth_failed");
         }
     }
 

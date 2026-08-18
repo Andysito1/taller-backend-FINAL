@@ -19,9 +19,16 @@ class DashboardController extends Controller
 
         $ordenesDelMes = OrdenServicio::whereYear('created_at', $anio)
             ->whereMonth('created_at', $mes)
-            ->with(['vehiculo.cliente.usuario', 'mecanico', 'servicio'])
+            ->with(['vehiculo.cliente.usuario', 'mecanico', 'servicio', 'etapas'])
             ->latest()
             ->get();
+
+        // 'estado' en ordenes_servicio solo distingue en_proceso/pausado/finalizado.
+        // Para un desglose útil (diagnóstico/reparación/pruebas/finalización) hay que
+        // mirar la etapa realmente activa, igual que hace el panel de Órdenes.
+        foreach ($ordenesDelMes as $orden) {
+            $orden->etapa_actual = $this->etapaActual($orden);
+        }
 
         $ingresosMes = (float) FinanzaServicio::whereYear('created_at', $anio)
             ->whereMonth('created_at', $mes)
@@ -36,7 +43,7 @@ class DashboardController extends Controller
 
         $ordenesActivasActual = OrdenServicio::whereNotIn('estado', ['finalizado', 'pausado'])->count();
 
-        $porEstado = $ordenesDelMes->groupBy('estado')
+        $porEstado = $ordenesDelMes->groupBy('etapa_actual')
             ->map(fn($grupo) => $grupo->count());
 
         $porMecanico = $ordenesDelMes->groupBy(fn($o) => $o->mecanico->nombre ?? 'Sin asignar')
@@ -61,5 +68,30 @@ class DashboardController extends Controller
             'por_servicio' => $porServicio,
             'ordenes' => $ordenesDelMes->values(),
         ]);
+    }
+
+    /**
+     * Determina la etapa "visible" de una orden: diagnostico/reparacion/pruebas/
+     * finalizacion mientras está activa, o finalizado/pausado si ya no lo está.
+     * Replica la lógica getEtapaKey() usada en el panel de Órdenes del frontend.
+     */
+    private function etapaActual(OrdenServicio $orden): string
+    {
+        $estado = strtolower($orden->estado ?? '');
+
+        if (in_array($estado, ['finalizado', 'pausado'])) {
+            return $estado;
+        }
+
+        $etapaActiva = $orden->etapas->firstWhere('estado', 'en_proceso');
+        if ($etapaActiva) {
+            return $etapaActiva->etapa;
+        }
+
+        if (in_array($estado, ['diagnostico', 'reparacion', 'pruebas', 'finalizacion'])) {
+            return $estado;
+        }
+
+        return 'diagnostico';
     }
 }
