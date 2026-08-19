@@ -59,6 +59,24 @@ class EvidenciaServicioController extends Controller
 
         $path = $archivo->store('evidencias', 'public');
 
+        // El disco 'public' tiene throw=false/report=false (config por defecto de
+        // Laravel), así que un fallo de escritura (p.ej. permisos del Volumen) no
+        // lanza excepción ni queda logueado: store() igual devuelve una ruta y,
+        // sin esta verificación, se crearía un registro apuntando a un archivo que
+        // nunca se escribió (imagen "corrupta" en el cliente).
+        if (!$path || !Storage::disk('public')->exists($path)) {
+            $root = config('filesystems.disks.public.root');
+            return response()->json([
+                'message' => 'No se pudo guardar el archivo en el servidor.',
+                'debug' => [
+                    'path_intentado' => $path,
+                    'disco_root' => $root,
+                    'root_existe' => is_dir($root),
+                    'root_escribible' => is_dir($root) ? is_writable($root) : null,
+                ],
+            ], 500);
+        }
+
         $evidencia = EvidenciaServicio::create([
             'id_etapa' => $etapa->id,
             'tipo' => $esVideo ? 'video' : 'imagen',
