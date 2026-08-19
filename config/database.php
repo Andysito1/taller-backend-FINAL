@@ -96,6 +96,13 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
+            // El host de la BD (Supabase) ya no está en la red privada del servidor,
+            // así que cada conexión nueva paga un handshake TCP+TLS por internet
+            // (~1s medido). Con conexiones persistentes, ese costo se paga una sola
+            // vez por proceso/worker de PHP en vez de en cada petición.
+            'options' => extension_loaded('pdo_pgsql') ? array_filter([
+                PDO::ATTR_PERSISTENT => env('DB_PERSISTENT', true),
+            ]) : [],
         ],
 
         'sqlsrv' => [
