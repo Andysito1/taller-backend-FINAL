@@ -40,7 +40,10 @@ return [
 
         'public' => [
             'driver' => 'local',
-            'root' => storage_path('app/public'),
+            // Permite apuntar el disco público directo a donde quede montado el
+            // Volumen de Railway (p.ej. PUBLIC_STORAGE_PATH=/data), sin depender de
+            // que el volumen esté montado exactamente en storage/app/public.
+            'root' => env('PUBLIC_STORAGE_PATH', storage_path('app/public')),
             'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
             'visibility' => 'public',
             'throw' => false,
@@ -74,7 +77,7 @@ return [
     */
 
     'links' => [
-        public_path('storage') => storage_path('app/public'),
+        public_path('storage') => env('PUBLIC_STORAGE_PATH', storage_path('app/public')),
     ],
 
 ];
