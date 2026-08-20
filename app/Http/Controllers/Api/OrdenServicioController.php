@@ -49,6 +49,7 @@ class OrdenServicioController extends Controller
             'titulo'       => 'required|string|max:100',
             'descripcion'  => 'required|string',
             'fecha_inicio' => 'required|date',
+            'fecha_fin'    => 'required|date|after_or_equal:fecha_inicio',
             'costo_total'  => 'nullable|numeric|min:0', // Nuevo campo, puede ser nulo al inicio
             'concepto_finanza' => 'nullable|string|max:100',
             'tipo_finanza' => 'nullable|in:base,adicional',
@@ -78,6 +79,7 @@ class OrdenServicioController extends Controller
                 'titulo'       => $request->titulo,
                 'descripcion'  => $request->descripcion,
                 'fecha_inicio' => $request->fecha_inicio,
+                'fecha_fin'    => $request->fecha_fin,
                 'estado'       => 'en_proceso',
                 'costo_total'  => $montoInicial, // Establecer costo inicial
                 'validacion_diagnostico' => 'en_espera'
@@ -175,7 +177,7 @@ class OrdenServicioController extends Controller
 
         $request->validate([
             'estado' => 'sometimes|in:en_proceso,pausado,finalizado',
-            'fecha_fin' => 'nullable|date',
+            'fecha_fin' => ['nullable', 'date', 'after_or_equal:' . $orden->fecha_inicio?->toDateString()],
             'id_servicio' => 'sometimes|exists:servicios,id', // Permitir actualizar el servicio
             'costo_total' => 'sometimes|numeric|min:0', // Permitir actualizar el costo total
         ]);

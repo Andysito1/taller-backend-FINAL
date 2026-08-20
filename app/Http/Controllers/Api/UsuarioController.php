@@ -46,12 +46,12 @@ class UsuarioController extends Controller
             'correo' => ['required', 'email', 'unique:usuarios,correo', 'regex:/^[^\s@]+@gmail\.com$/i'],
             'password' => 'required|min:6',
             'id_rol' => 'required|exists:roles,id',
-            'telefono' => 'nullable|string|regex:/^[0-9]+$/',
+            'telefono' => 'nullable|string|regex:/^[0-9]{1,15}$/',
             'direccion' => 'nullable|string',
             'especialidad' => 'nullable|string' // Opcional para mecánicos
         ], [
             'correo.regex' => 'El correo electrónico debe ser una cuenta de Gmail (usuario@gmail.com).',
-            'telefono.regex' => 'El teléfono solo puede contener números.',
+            'telefono.regex' => 'El teléfono solo puede contener hasta 15 dígitos numéricos, sin espacios.',
         ]);
 
         // Verificar roles
@@ -67,24 +67,16 @@ class UsuarioController extends Controller
          */
         if ($esCliente || $esMecanico) {
             $request->validate([
-                'telefono' => 'required|string',
+                'telefono' => 'required|string|regex:/^[0-9]{1,15}$/',
                 'direccion' => 'required|string',
                 'id_tipo_documento' => 'required|exists:tipos_documento,id',
                 'numero_documento' => [
                     'required',
                     'unique:usuarios,numero_documento',
-                    function ($attribute, $value, $fail) use ($request) {
-                        $tipo = TipoDocumento::find($request->id_tipo_documento);
-                        if (!$tipo) return;
-
-                        if ($tipo->longitud_exacta && strlen($value) != $tipo->longitud_exacta) {
-                            $fail("El documento {$tipo->abreviatura} debe tener {$tipo->longitud_exacta} caracteres.");
-                        }
-                        if ($tipo->longitud_maxima && strlen($value) > $tipo->longitud_maxima) {
-                            $fail("El documento {$tipo->abreviatura} no puede exceder los {$tipo->longitud_maxima} caracteres.");
-                        }
-                    }
+                    $this->numeroDocumentoValidator($request->id_tipo_documento)
                 ]
+            ], [
+                'telefono.regex' => 'El teléfono solo puede contener hasta 15 dígitos numéricos, sin espacios.',
             ]);
         }
 
@@ -153,10 +145,22 @@ class UsuarioController extends Controller
             'correo' => 'required|email|unique:usuarios,correo,' . $id,
             'id_rol' => 'required|exists:roles,id',
             'password' => 'nullable|min:6',
-            'telefono' => 'nullable|string|regex:/^[0-9]+$/',
+            'telefono' => 'nullable|string|regex:/^[0-9]{1,15}$/',
         ], [
-            'telefono.regex' => 'El teléfono solo puede contener números.',
+            'telefono.regex' => 'El teléfono solo puede contener hasta 15 dígitos numéricos, sin espacios.',
         ]);
+
+        $rolDestino = Role::find($request->id_rol);
+        if ($rolDestino && in_array($rolDestino->nombre, ['CLIENTE', 'MECANICO'], true)) {
+            $request->validate([
+                'id_tipo_documento' => 'required|exists:tipos_documento,id',
+                'numero_documento' => [
+                    'required',
+                    'unique:usuarios,numero_documento,' . $id,
+                    $this->numeroDocumentoValidator($request->id_tipo_documento)
+                ]
+            ]);
+        }
 
         $data = $request->only(['nombre', 'correo', 'id_rol', 'telefono', 'direccion', 'id_tipo_documento', 'numero_documento']);
 
@@ -391,6 +395,36 @@ class UsuarioController extends Controller
         }
 
         return response()->json($usuario);
+    }
+
+    /**
+     * Valida el formato del número de documento según el tipo seleccionado:
+     * DNI/RUC/CE deben ser solo dígitos con la longitud exacta configurada en
+     * tipos_documento; PASAPORTE debe ser alfanumérico, sin símbolos ni espacios.
+     */
+    private function numeroDocumentoValidator($idTipoDocumento): \Closure
+    {
+        return function ($attribute, $value, $fail) use ($idTipoDocumento) {
+            $tipo = TipoDocumento::find($idTipoDocumento);
+            if (!$tipo) return;
+
+            $esPasaporte = $tipo->abreviatura === 'PAS';
+
+            if ($esPasaporte) {
+                if (!ctype_alnum($value)) {
+                    $fail('El pasaporte debe ser un código alfanumérico, sin símbolos ni espacios.');
+                }
+            } elseif (!ctype_digit((string) $value)) {
+                $fail("El documento {$tipo->abreviatura} solo puede contener dígitos.");
+            }
+
+            if ($tipo->longitud_exacta && strlen($value) != $tipo->longitud_exacta) {
+                $fail("El documento {$tipo->abreviatura} debe tener {$tipo->longitud_exacta} dígitos.");
+            }
+            if ($tipo->longitud_maxima && strlen($value) > $tipo->longitud_maxima) {
+                $fail("El documento {$tipo->abreviatura} no puede exceder los {$tipo->longitud_maxima} caracteres.");
+            }
+        };
     }
 
     public function updateFcmToken(Request $request) {

@@ -33,6 +33,8 @@ class ClientesServiciosExport implements FromQuery, WithHeadings, WithMapping, W
                 'u.nombre as cliente_nombre',
                 'u.correo as cliente_correo',
                 'u.telefono as cliente_telefono',
+                'td.abreviatura as tipo_documento',
+                'u.numero_documento',
                 'v.placa',
                 'v.marca',
                 'v.modelo',
@@ -69,6 +71,11 @@ class ClientesServiciosExport implements FromQuery, WithHeadings, WithMapping, W
             $query->whereIn('s.nombre', $this->filtros['servicios']);
         }
 
+        // Filtro de Estado de la Orden (Array): en_proceso, pausado, finalizado
+        if (!empty($this->filtros['estados'])) {
+            $query->whereIn('ordenes_servicio.estado', $this->filtros['estados']);
+        }
+
         return $query;
     }
 
@@ -78,6 +85,9 @@ class ClientesServiciosExport implements FromQuery, WithHeadings, WithMapping, W
             'Nombre del Cliente',
             'Correo',
             'Teléfono',
+            'Tipo Cliente',
+            'Tipo Documento',
+            'N° Documento',
             'Placa Vehículo',
             'Marca',
             'Modelo',
@@ -94,6 +104,9 @@ class ClientesServiciosExport implements FromQuery, WithHeadings, WithMapping, W
             $orden->cliente_nombre,
             $orden->cliente_correo,
             $orden->cliente_telefono,
+            $orden->tipo_documento === 'RUC' ? 'Persona Jurídica' : 'Persona Natural',
+            $orden->tipo_documento,
+            $orden->numero_documento,
             $orden->placa,
             $orden->marca,
             $orden->modelo,
@@ -108,7 +121,7 @@ class ClientesServiciosExport implements FromQuery, WithHeadings, WithMapping, W
     {
         return [
             AfterSheet::class => function(AfterSheet $event) {
-                $headerRange = 'A1:J1';
+                $headerRange = 'A1:M1';
 
                 $event->sheet->getStyle($headerRange)->applyFromArray([
                     'font' => [

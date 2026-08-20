@@ -17,13 +17,15 @@ class ReporteController extends Controller
     {
         $request->validate([
             'tipo_filtro' => 'required|in:anio,mes_especifico,rango',
-            'anio' => 'required|integer|min:2025',
-            'mes' => 'nullable|integer|between:1,12',
-            'mes_inicio' => 'nullable|integer|between:1,12',
-            'mes_fin' => 'nullable|integer|between:1,12',
+            'anio' => 'required|integer|min:2025|max:' . now()->year,
+            'mes' => 'required_if:tipo_filtro,mes_especifico|nullable|integer|between:1,12',
+            'mes_inicio' => 'required_if:tipo_filtro,rango|nullable|integer|between:1,12',
+            'mes_fin' => 'required_if:tipo_filtro,rango|nullable|integer|between:1,12|gte:mes_inicio',
             'tipo_cliente' => 'nullable|string|in:persona,empresa',
             'servicios' => 'required|array',
-            'servicios.*' => 'string'
+            'servicios.*' => 'string',
+            'estados' => 'required|array',
+            'estados.*' => 'in:en_proceso,pausado,finalizado',
         ]);
 
         $filtros = $request->all();
@@ -36,7 +38,8 @@ class ReporteController extends Controller
             ->join('servicios as s', 'o.id_servicio', '=', 's.id')
             ->join('tipos_documento as td', 'u.id_tipo_documento', '=', 'td.id')
             ->whereYear('o.fecha_inicio', $request->anio)
-            ->whereIn('s.nombre', $request->servicios);
+            ->whereIn('s.nombre', $request->servicios)
+            ->whereIn('o.estado', $request->estados);
 
         // Aplicar filtros de tiempo dinámicos
         if ($request->tipo_filtro === 'mes_especifico') {
