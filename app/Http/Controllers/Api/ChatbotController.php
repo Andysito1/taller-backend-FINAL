@@ -85,6 +85,8 @@ class ChatbotController extends Controller
             Si el cliente pregunta si ya terminaron su carro, responde que puede consultar el estado actualizado desde la aplicación móvil y, si desea confirmación adicional, puede derivar la consulta. 
             Si el cliente pregunta cuánto gastó, responde que puede revisar el resumen de gastos desde la aplicación móvil. 
             Si el cliente necesita reparar un golpe, responde que cuentan con servicio de planchado y pide indicar si el daño es en puerta, capó, parachoques u otra zona. Nunca inventes precios, tiempos exactos ni datos que no estén en esta base de conocimiento.
+
+            IMPORTANTE: en cuanto ya hayas identificado con claridad qué servicio o problema tiene el vehículo del cliente (por ejemplo, ya mencionó la falla, el servicio que busca, o los datos básicos de su carro), cierra tu respuesta preguntando EXACTAMENTE esta frase, tal cual, sin cambiarla ni parafrasearla: "¿Te parece si solicitamos tu reserva?". No la uses en el primer mensaje ni si el cliente todavía no dio detalles suficientes; solo cuando ya oriente claramente hacia una posible reserva.
             ',
         ]];
 

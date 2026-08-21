@@ -17,12 +17,15 @@ use App\Http\Controllers\Api\ReporteController;
 use App\Http\Controllers\Api\ChatbotController;
 use App\Http\Controllers\Api\EvidenciaServicioController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\SolicitudReservaController;
 
 Route::get('/sanctum/csrf-cookie', function () {
     return response()->json(['csrf' => 'ok']);
 });
 
 Route::post('/chatbot/message', [ChatbotController::class, 'message']);
+Route::post('/solicitudes-reserva', [SolicitudReservaController::class, 'store']);
+Route::get('/tipos-documento-publico', [UsuarioController::class, 'indexTiposDocumento']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
 Route::post('/verify-reset-code', [AuthController::class, 'verifyResetCode']);
@@ -70,6 +73,9 @@ Route::middleware(['auth:sanctum', 'role:ADMIN'])->group(function () {
     Route::get('servicios-lista', function() { return \App\Models\Servicio::all(); });
     Route::post('reportes/clientes-servicios', [ReporteController::class, 'exportarClientesServicios']);
     Route::get('/dashboard/resumen', [DashboardController::class, 'resumen']);
+    Route::get('/solicitudes-reserva', [SolicitudReservaController::class, 'index']);
+    Route::patch('/solicitudes-reserva/{id}/estado', [SolicitudReservaController::class, 'updateEstado']);
+    Route::get('/solicitudes-reserva/pendientes-count', [SolicitudReservaController::class, 'pendientesCount']);
 });
     
     // Rutas compartidas para Admin y Cliente

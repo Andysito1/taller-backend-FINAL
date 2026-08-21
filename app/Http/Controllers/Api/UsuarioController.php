@@ -43,14 +43,14 @@ class UsuarioController extends Controller
     {
         $request->validate([
             'nombre' => 'required|string|max:255', // Aumentamos a 255 por si es Razón Social larga
-            'correo' => ['required', 'email', 'unique:usuarios,correo', 'regex:/^[^\s@]+@gmail\.com$/i'],
-            'password' => 'required|min:6',
+            'correo' => ['required', 'email', 'unique:usuarios,correo', 'regex:/^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/'],
+            'password' => 'required|min:8',
             'id_rol' => 'required|exists:roles,id',
             'telefono' => 'nullable|string|regex:/^[0-9]{1,15}$/',
             'direccion' => 'nullable|string',
             'especialidad' => 'nullable|string' // Opcional para mecánicos
         ], [
-            'correo.regex' => 'El correo electrónico debe ser una cuenta de Gmail (usuario@gmail.com).',
+            'correo.regex' => 'Correo inválido',
             'telefono.regex' => 'El teléfono solo puede contener hasta 15 dígitos numéricos, sin espacios.',
         ]);
 
@@ -144,7 +144,7 @@ class UsuarioController extends Controller
             'nombre' => 'required|string|max:255',
             'correo' => 'required|email|unique:usuarios,correo,' . $id,
             'id_rol' => 'required|exists:roles,id',
-            'password' => 'nullable|min:6',
+            'password' => 'nullable|min:8',
             'telefono' => 'nullable|string|regex:/^[0-9]{1,15}$/',
         ], [
             'telefono.regex' => 'El teléfono solo puede contener hasta 15 dígitos numéricos, sin espacios.',

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\OrdenServicio;
 use App\Models\FinanzaServicio;
+use App\Models\SolicitudReserva;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
@@ -55,6 +56,11 @@ class DashboardController extends Controller
             ->map(fn($grupo) => $grupo->count())
             ->sortDesc();
 
+        $solicitudesPendientes = SolicitudReserva::where('estado', 'pendiente')->count();
+        $solicitudesAtendidas = SolicitudReserva::where('estado', 'atendida')->count();
+        $solicitudesRechazadas = SolicitudReserva::where('estado', 'rechazada')->count();
+        $solicitudesGestionadas = $solicitudesAtendidas + $solicitudesRechazadas;
+
         return response()->json([
             'anio' => $anio,
             'mes' => $mes,
@@ -67,6 +73,12 @@ class DashboardController extends Controller
             'por_mecanico' => $porMecanico,
             'por_servicio' => $porServicio,
             'ordenes' => $ordenesDelMes->values(),
+            'solicitudes_pendientes' => $solicitudesPendientes,
+            'solicitudes_atendidas' => $solicitudesAtendidas,
+            'solicitudes_rechazadas' => $solicitudesRechazadas,
+            'tasa_conversion_solicitudes' => $solicitudesGestionadas > 0
+                ? round($solicitudesAtendidas / $solicitudesGestionadas * 100, 1)
+                : 0,
         ]);
     }
 
