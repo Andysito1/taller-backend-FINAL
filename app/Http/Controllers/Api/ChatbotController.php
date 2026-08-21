@@ -20,15 +20,25 @@ class ChatbotController extends Controller
 
         $messages = $this->buildMessages($history, $userMessage);
 
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $this->apiKey(),
-            'Content-Type' => 'application/json',
-        ])->timeout(30)->post('https://api.groq.com/openai/v1/chat/completions', [
-            'model' => $this->model(),
-            'messages' => $messages,
-            'temperature' => 0.7,
-            'max_tokens' => 200,
-        ]);
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $this->apiKey(),
+                'Content-Type' => 'application/json',
+            ])->timeout(20)->post('https://api.groq.com/openai/v1/chat/completions', [
+                'model' => $this->model(),
+                'messages' => $messages,
+                'temperature' => 0.7,
+                'max_tokens' => 200,
+            ]);
+        } catch (\Exception $e) {
+            // Cualquier fallo de red/timeout con Groq no debe dejar al cliente sin
+            // respuesta: siempre devolvemos 200 con un mensaje de respaldo.
+            return response()->json([
+                'reply' => 'Lo siento, no pude responder en este momento. Puedes escribirnos directamente o contactarnos para recibir ayuda personalizada.',
+                'provider' => 'groq-fallback',
+                'status' => 'fallback',
+            ], 200);
+        }
 
         if ($response->failed()) {
             return response()->json([
