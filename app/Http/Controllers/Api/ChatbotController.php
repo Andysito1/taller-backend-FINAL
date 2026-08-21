@@ -27,7 +27,7 @@ class ChatbotController extends Controller
             'model' => $this->model(),
             'messages' => $messages,
             'temperature' => 0.7,
-            'max_tokens' => 250,
+            'max_tokens' => 200,
         ]);
 
         if ($response->failed()) {
@@ -39,7 +39,9 @@ class ChatbotController extends Controller
         }
 
         $content = data_get($response->json(), 'choices.0.message.content');
+        $finishReason = data_get($response->json(), 'choices.0.finish_reason');
         $reply = is_string($content) ? trim($content) : $this->fallbackReply();
+        $reply = $this->limpiarRespuesta($reply, $finishReason);
 
         return response()->json([
             'reply' => $reply,
@@ -48,14 +50,45 @@ class ChatbotController extends Controller
         ]);
     }
 
+    /**
+     * Quita cualquier resto de formato Markdown (el chat solo muestra texto plano)
+     * y, si el modelo se quedó sin tokens a mitad de una oración, recorta hasta el
+     * último punto/signo completo para no mostrar una frase cortada.
+     */
+    private function limpiarRespuesta(string $reply, ?string $finishReason): string
+    {
+        $reply = str_replace(['**', '__', '*', '#'], '', $reply);
+
+        if ($finishReason === 'length') {
+            $posiciones = array_filter([
+                strrpos($reply, '.'),
+                strrpos($reply, '!'),
+                strrpos($reply, '?'),
+            ], fn ($pos) => $pos !== false);
+
+            if (!empty($posiciones)) {
+                $reply = substr($reply, 0, max($posiciones) + 1);
+            }
+        }
+
+        return trim($reply);
+    }
+
     private function buildMessages(array $history, string $message): array
     {
         $messages = [[
             'role' => 'system',
-            'content' => 'Eres el asistente virtual de Xtreme Performance, un taller automotriz 
-            especializado en mantenimiento (mantenimiento preventivo y correctivo), reparación y mejora de vehículos. 
-            Responde en español, de forma amable, muy concisa y breve, además de dar una orientación correcta al cliente. 
-            Tu objetivo es informar sobre los servicios de mantenimiento automotriz, planchado, 
+            'content' => 'Eres el asistente virtual de Xtreme Performance, un taller automotriz
+            especializado en mantenimiento (mantenimiento preventivo y correctivo), reparación y mejora de vehículos.
+            Responde siempre en español, de forma amable y directa.
+
+            REGLAS DE FORMATO Y LONGITUD (muy importantes, nunca las rompas):
+            - Máximo 2 a 3 oraciones cortas por respuesta (no más de ~50 palabras en total).
+            - Nunca dejes una idea o palabra a medias: si algo no entra en ese límite, resume más, no la cortes.
+            - No uses asteriscos, guiones de lista, ni ningún otro símbolo de formato Markdown (nada de **negrita**, _cursiva_ o títulos); solo texto plano, porque el cliente lo lee en un chat que no interpreta Markdown.
+            - Todo lo que digas debe apuntar a que el cliente termine agendando un servicio en el taller: no des explicaciones técnicas extensas, ve al grano y orienta hacia la reserva.
+
+            Tu objetivo es informar sobre los servicios de mantenimiento automotriz, planchado,
             pintura y traccionamiento, ayudar a identificar el servicio adecuado, dar información 
             general sobre seguimiento de servicios y derivar a un personal especializado 
             cuando el cliente pida cotización exacta, diagnóstico, reclamos, modificación de una reserva, 
