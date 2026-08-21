@@ -27,7 +27,7 @@ class SolicitudReservaController extends Controller
             'telefono' => 'required|string|regex:/^[0-9]{1,15}$/',
             'vehiculo_marca' => 'required|string|max:50',
             'vehiculo_modelo' => 'required|string|max:50',
-            'vehiculo_anio' => "required|integer|min:1980|max:" . ($anioActual + 1),
+            'vehiculo_anio' => "required|integer|min:1950|max:" . ($anioActual + 1),
             'problema' => 'required|string',
         ], [
             'correo.regex' => 'Correo inválido',
